@@ -29,8 +29,8 @@ export const StatusBar = ({
   codeTitle
 }) => {
   return (
-    <footer className="bg-gray-800/50 backdrop-blur-sm border-t border-gray-700 px-4 py-2">
-      <div className="flex justify-between items-center text-sm text-gray-400">
+    <footer className="bg-white backdrop-blur-sm border-t border-gray-600 px-4 py-2">
+      <div className="flex justify-between items-center text-sm text-black">
         <div className="flex items-center gap-4">
           <span>Language: {lang}</span>
           <span>Lines: {code.split('\n').length}</span>
@@ -67,13 +67,11 @@ export const StatusBar = ({
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
-                  className="flex items-center gap-2 px-3 py-1 bg-gray-700/50 hover:bg-gray-600/50 rounded transition-colors text-gray-300 hover:text-white"
+                  className="flex items-center gap-2 px-3 py-1 bg-white  rounded transition-colors text-black "
                 >
-                  <div className="w-6 h-6 bg-gradient-to-r from-indigo-600 to-purple-600 rounded-full flex items-center justify-center">
+                  <div className="w-6 h-6 bg-gray-600 rounded-full flex items-center justify-center">
                     <User className="w-3 h-3 text-white" />
                   </div>
-                  <span className="text-xs">{user.email}</span>
-                  <span className="text-xs text-gray-500">({savedCodes.length})</span>
                 </button>
                 
                 <UserMenu
@@ -96,7 +94,7 @@ export const StatusBar = ({
           ) : (
             <button
               onClick={() => router.push('/login')}
-              className="flex items-center gap-2 px-3 py-1 bg-indigo-600 hover:bg-indigo-700 rounded transition-colors text-white text-xs"
+              className="flex items-center gap-2 px-3 py-1 bg-black hover:text-gray-300 rounded transition-colors text-white text-xs"
             >
               <User className="w-3 h-3" />
               <span>Sign in</span>

@@ -1,0 +1,58 @@
+version: '3.8'
+
+services:
+  python-runner:
+    build:
+      context: ./docker/python
+      dockerfile: Dockerfile
+    container_name: python-runner
+    volumes:
+      - ./temp/python:/app/code
+    networks:
+      - code-execution
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  node-runner:
+    build:
+      context: ./docker/node
+      dockerfile: Dockerfile
+    container_name: node-runner
+    volumes:
+      - ./temp/node:/app/code
+    networks:
+      - code-execution
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+  java-runner:
+    build:
+      context: ./docker/java
+      dockerfile: Dockerfile
+    container_name: java-runner
+    volumes:
+      - ./temp/java:/app/code
+    networks:
+      - code-execution
+    restart: unless-stopped
+    mem_limit: 512m
+    cpus: 0.5
+
+  cpp-runner:
+    build:
+      context: ./docker/cpp
+      dockerfile: Dockerfile
+    container_name: cpp-runner
+    volumes:
+      - ./temp/cpp:/app/code
+    networks:
+      - code-execution
+    restart: unless-stopped
+    mem_limit: 256m
+    cpus: 0.5
+
+networks:
+  code-execution:
+    driver: bridge

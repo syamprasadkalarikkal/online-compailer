@@ -1,0 +1,9 @@
+{
+  "name": "node-runner",
+  "version": "1.0.0",
+  "description": "Node.js code execution runner",
+  "main": "runner.js",
+  "dependencies": {
+    "vm2": "^3.9.19"
+  }
+}

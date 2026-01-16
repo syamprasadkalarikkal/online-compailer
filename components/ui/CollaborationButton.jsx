@@ -1,10 +1,10 @@
-// components/CollaborationButton.jsx - FIXED VERSION
-import React, { useState } from 'react';
-import { Users, Send, X, AlertCircle } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Users, Send, X, AlertCircle,Plus } from 'lucide-react';
 
 export const CollaborationButton = ({
   currentCodeId,
   codeTitle,
+  codeLanguage,
   user,
   supabase
 }) => {
@@ -14,6 +14,33 @@ export const CollaborationButton = ({
   const [sending, setSending] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [senderProfile, setSenderProfile] = useState({ name: '', avatar_url: null });
+
+  // Load sender's profile (name + avatar) on mount
+  useEffect(() => {
+    const loadSenderProfile = async () => {
+      if (!user || !supabase) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name, avatar_url')
+          .eq('user_id', user.id)
+          .single();
+
+        if (!error && data) {
+          setSenderProfile({
+            name: data.name || '',
+            avatar_url: data.avatar_url || null
+          });
+        }
+      } catch (err) {
+        console.error('Error loading sender profile:', err);
+      }
+    };
+
+    loadSenderProfile();
+  }, [user, supabase]);
 
   const sendCollaborationRequest = async () => {
     const email = recipientEmail.trim().toLowerCase();
@@ -37,24 +64,21 @@ export const CollaborationButton = ({
     setError(null);
 
     try {
-      console.log('🔍 Looking up user by email:', email);
-      
-      // Use the database function to find user
       const { data: recipientUserId, error: lookupError } = await supabase
         .rpc('get_user_id_by_email', { email_to_check: email });
 
       if (lookupError) {
-        console.error('Error looking up user:', lookupError);
+        
         throw new Error('Failed to look up user: ' + lookupError.message);
       }
 
       if (!recipientUserId) {
-        setError('⚠️ No account exists with that email. They need to sign up first.');
+        setError('No account exists with that email. They need to sign up first.');
         setSending(false);
         return;
       }
 
-      console.log('✅ Found user:', recipientUserId);
+     
 
       // Check for existing requests
       const { data: existingRequest, error: existingError } = await supabase
@@ -67,7 +91,7 @@ export const CollaborationButton = ({
         .maybeSingle();
 
       if (existingError) {
-        console.error('Error checking existing requests:', existingError);
+       
         throw new Error('Failed to check existing requests: ' + existingError.message);
       }
 
@@ -81,15 +105,19 @@ export const CollaborationButton = ({
         return;
       }
 
-      console.log('📤 Creating collaboration request...');
+      
 
-      // Create the request (NOW WITH sender_email)
+      // Create the request with sender name AND avatar URL
       const requestData = {
         code_id: currentCodeId,
         sender_id: user.id,
-        sender_email: user.email, // Include sender email for display
+        sender_email: user.email,
+        sender_name: senderProfile.name || null,
+        sender_avatar_url: senderProfile.avatar_url || null, // ✅ Include avatar
         recipient_id: recipientUserId,
-        message: message.trim() || `${user.email} wants to collaborate on "${codeTitle}"`,
+        message: message.trim() || null,
+        code_title: codeTitle || 'Untitled',
+        code_language: codeLanguage || 'text',
         status: 'pending',
         created_at: new Date().toISOString()
       };
@@ -100,11 +128,10 @@ export const CollaborationButton = ({
         .select();
 
       if (insertError) {
-        console.error('Error inserting request:', insertError);
         throw new Error('Failed to send request: ' + insertError.message);
       }
 
-      console.log('✅ Request sent successfully!', insertedData);
+      
 
       // Success!
       setSuccess(true);
@@ -117,7 +144,7 @@ export const CollaborationButton = ({
       }, 2000);
 
     } catch (error) {
-      console.error('❌ Collaboration request error:', error);
+      
       setError(error.message || 'Something went wrong. Please try again.');
     } finally {
       setSending(false);
@@ -132,13 +159,12 @@ export const CollaborationButton = ({
         disabled={!currentCodeId}
         className={`flex items-center gap-2 px-3 py-1 rounded transition-colors text-sm ${
           currentCodeId
-            ? 'bg-gray-700/50 hover:bg-gray-600/50 text-gray-300 hover:text-white'
-            : 'bg-gray-700/30 text-gray-500 cursor-not-allowed'
+            ? 'bg-white hover:text-gray-600 text-blak'
+            : 'bg-white text-gray-400 cursor-not-allowed'
         }`}
         title={currentCodeId ? "Invite collaborator" : "Save code first to collaborate"}
       >
-        <Users className="w-4 h-4" />
-        <span className="hidden sm:inline">Collaborate</span>
+        <Users className="w-5 h-5" />
       </button>
 
       {showDialog && (
@@ -181,7 +207,7 @@ export const CollaborationButton = ({
 
               {success && (
                 <div className="text-sm bg-green-50 border border-green-200 text-green-700 px-3 py-2 rounded">
-                  ✅ Request sent successfully!
+                  Request sent successfully!
                 </div>
               )}
 
@@ -196,7 +222,7 @@ export const CollaborationButton = ({
                     setError(null);
                   }}
                   disabled={sending}
-                  className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-gray-500"
                   placeholder="someone@example.com"
                 />
               </div>
@@ -210,7 +236,7 @@ export const CollaborationButton = ({
                   rows={3}
                   disabled={sending}
                   maxLength={200}
-                  className="w-full px-3 py-2 border rounded resize-none focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  className="w-full px-3 py-2 border rounded resize-none focus:outline-none focus:ring-2 focus:ring-gray-500"
                   placeholder="Add a personal message..."
                 />
                 <p className="text-xs text-gray-500 mt-1">{message.length}/200</p>
@@ -227,7 +253,7 @@ export const CollaborationButton = ({
                 Cancel
               </button>
               <button
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 rounded bg-black hover:text-gray-400 text-white disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                 onClick={sendCollaborationRequest}
                 disabled={sending || !recipientEmail.trim()}
               >

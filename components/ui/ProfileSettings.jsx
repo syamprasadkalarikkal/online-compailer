@@ -1,4 +1,4 @@
-// components/ProfileSettings.jsx - Corrected to match users table structure
+// components/ProfileSettings.jsx - Without local storage fallback
 import React, { useState, useRef } from 'react';
 import { Camera, Save, X, User, Mail, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -100,7 +100,6 @@ export const ProfileSettings = ({
         });
 
       if (uploadError) {
-        console.error('Upload error:', uploadError);
         setError('Failed to upload image. Please try again.');
         return;
       }
@@ -126,7 +125,6 @@ export const ProfileSettings = ({
       setSuccess('Profile picture uploaded. Click Save to keep changes.');
       setTimeout(() => setSuccess(null), 3000);
     } catch (error) {
-      console.error('Error uploading image:', error);
       setError('Failed to upload image. Please try again.');
     } finally {
       setUploadingImage(false);
@@ -142,34 +140,16 @@ export const ProfileSettings = ({
       return;
     }
 
+    if (!supabase) {
+      setError('Database connection is not available. Please try again later.');
+      return;
+    }
+
     setSaving(true);
     setError(null);
     setSuccess(null);
 
     try {
-      // If supabase is not available, just update local state
-      if (!supabase) {
-        console.warn('No Supabase client - updating locally only');
-        
-        const updatedProfile = {
-          ...profileData,
-          name: profileData.name.trim(),
-          bio: profileData.bio || ''
-        };
-        
-        setProfileData(updatedProfile);
-
-        if (onUserUpdate) {
-          onUserUpdate();
-        }
-
-        setSuccess('Profile updated locally. Database connection not available - changes won\'t persist.');
-        setTimeout(() => {
-          setActiveView('profile');
-        }, 2000);
-        return;
-      }
-
       // Verify authentication
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
       
@@ -251,8 +231,7 @@ export const ProfileSettings = ({
       }, 1500);
 
     } catch (error) {
-      console.error('Error saving profile:', error);
-      setError(error.message || 'Failed to save profile');
+      setError(error.message || 'Failed to save profile. Please try again.');
     } finally {
       setSaving(false);
     }
@@ -408,7 +387,7 @@ export const ProfileSettings = ({
         <div className="flex gap-3 pt-4">
           <button
             onClick={handleSave}
-            disabled={saving || !profileData.name?.trim()}
+            disabled={saving || !profileData.name?.trim() || !supabase}
             className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
           >
             {saving ? (
@@ -437,7 +416,7 @@ export const ProfileSettings = ({
         {!supabase && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-yellow-800 text-sm">
-              Database connection unavailable. Changes will only be saved locally and won't persist between sessions.
+              Database connection unavailable. Please check your connection and try again.
             </p>
           </div>
         )}
@@ -449,4 +428,4 @@ export const ProfileSettings = ({
       </div>
     </div>
   );
-};
+}

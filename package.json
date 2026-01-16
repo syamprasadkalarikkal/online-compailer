@@ -5,7 +5,14 @@
   "scripts": {
     "dev": "next dev --turbopack",
     "build": "next build --turbopack",
-    "start": "next start"
+    "start": "next start",
+    "docker:setup": "bash setup-docker.sh",
+    "docker:build": "docker-compose build",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "docker:clean": "docker-compose down -v && docker system prune -f",
+    "docker:logs": "docker-compose logs -f",
+    "docker:status": "docker ps --filter name=runner"
   },
   "dependencies": {
     "@codemirror/lang-cpp": "^6.0.3",

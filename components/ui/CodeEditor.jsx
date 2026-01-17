@@ -10,8 +10,8 @@ import { rust } from "@codemirror/lang-rust";
 import { php } from "@codemirror/lang-php";
 import { Code, Check, Copy, RotateCcw, Download, Play, Lock, Pause, Plus, Save, Edit3, X } from 'lucide-react';
 import { CodeConverter } from './CodeConverter';
+import AICopilot from './AICopilot';
 
-// Language extension mapping
 const getLanguageExtension = (lang) => {
   switch (lang) {
     case 'javascript':
@@ -36,7 +36,6 @@ const getLanguageExtension = (lang) => {
   }
 };
 
-// File extensions mapping
 const fileExtensions = {
   javascript: 'js',
   typescript: 'ts',
@@ -49,7 +48,6 @@ const fileExtensions = {
   php: 'php'
 };
 
-// Custom white theme for CodeMirror
 const whiteTheme = EditorView.theme({
   "&": {
     backgroundColor: "#ffffff",
@@ -145,28 +143,22 @@ export const CodeEditor = ({
   };
 
   const handleCodeConverted = (convertedCode, targetLang) => {
-    console.log('=== Code Conversion Complete ===');
-    console.log('Target language:', targetLang);
-    console.log('Converted code length:', convertedCode.length);
-    console.log('Converted code preview:', convertedCode.substring(0, 150));
-    
-    // First update the code
     setCode(convertedCode);
     
-    // Then update the language if setLang is available
     if (setLang && typeof setLang === 'function') {
-      // Pass true as second parameter to skip code reset in Client.jsx
       setLang(targetLang, true);
       alert(`✅ Code successfully converted to ${targetLang}!`);
     } else {
-      console.error('setLang is not available or not a function');
       alert('⚠️ Code converted but language could not be changed. Please select the language manually.');
     }
   };
 
+  const handleCopilotFix = (fixedCode, explanation) => {
+    setCode(fixedCode);
+  };
+
   return (
     <div className="bg-white backdrop-blur-sm border-r border-gray-600 flex flex-col h-full">
-      {/* Save Dialog - Inline at top */}
       {showSaveDialog && (
         <div className="w-full bg-blue-50 border-b border-blue-200 shadow-sm">
           <div className="w-full px-4 py-3">
@@ -248,7 +240,6 @@ export const CodeEditor = ({
         </div>
       )}
 
-      {/* Header */}
       <div className="flex items-center justify-between p-3 bg-white border-b border-gray-600">
         <div className="flex items-center gap-2 text-gray-900">
           <Code className="w-5 h-5 text-indigo-600" />
@@ -271,7 +262,6 @@ export const CodeEditor = ({
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Code Converter Button */}
           {!isEditingSavedCode && (
             <CodeConverter
               currentLang={lang}
@@ -282,7 +272,6 @@ export const CodeEditor = ({
             />
           )}
 
-          {/* New Button */}
           <button
             onClick={createNewCode}
             className="flex items-center gap-1 px-2 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-all text-sm"
@@ -292,7 +281,6 @@ export const CodeEditor = ({
             <span className="hidden sm:inline">New</span>
           </button>
 
-          {/* Save Button */}
           {user ? (
             <button
               onClick={handleSaveClick}
@@ -322,10 +310,8 @@ export const CodeEditor = ({
             </div>
           )}
           
-          {/* Separator */}
           <div className="w-px h-6 bg-gray-300"></div>
 
-          {/* Copy Button */}
           <button
             onClick={copyCode}
             className={`p-2 rounded-lg transition-all ${
@@ -338,7 +324,6 @@ export const CodeEditor = ({
             {isCopied ? <Check className="w-4 h-3" /> : <Copy className="w-4 h-3" />}
           </button>
           
-          {/* Reset Button */}
           <button
             onClick={resetCode}
             disabled={readOnly}
@@ -348,7 +333,6 @@ export const CodeEditor = ({
             <RotateCcw className="w-4 h-3" />
           </button>
           
-          {/* Download Button */}
           <button
             onClick={downloadCode}
             className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
@@ -357,7 +341,6 @@ export const CodeEditor = ({
             <Download className="w-4 h-3" />
           </button>
           
-          {/* Run Button */}
           <button
             onClick={runCode}
             disabled={isRunning}
@@ -380,7 +363,6 @@ export const CodeEditor = ({
         </div>
       </div>
 
-      {/* CodeMirror Editor */}
       <div className="flex-1 relative min-h-0 bg-white code-editor-container">
         <CodeMirror
           value={code}
@@ -407,7 +389,6 @@ export const CodeEditor = ({
         />
       </div>
 
-      {/* Custom styles */}
       <style jsx global>{`
         .codemirror-readonly .cm-content {
           cursor: not-allowed;
@@ -457,6 +438,14 @@ export const CodeEditor = ({
           background-color: #3b82f6 !important;
         }
       `}</style>
+
+      {/* Floating AI Copilot */}
+      <AICopilot
+        code={code}
+        lang={lang}
+        onFixApplied={handleCopilotFix}
+        isEnabled={!readOnly}
+      />
     </div>
   );
 };

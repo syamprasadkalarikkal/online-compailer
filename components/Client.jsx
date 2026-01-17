@@ -742,16 +742,21 @@ export default function Client() {
     }
   };
 
-  const handleLanguageChange = (newLang) => {
-    if (isEditingSavedCode) {
+  const handleLanguageChange = (newLang, skipCodeReset = false) => {
+    // Skip the saved code check if this is coming from the converter
+    if (!skipCodeReset && isEditingSavedCode) {
       alert('Cannot change language while editing a saved code. Click "New" to start fresh.');
       return;
     }
     
     setLang(newLang);
-    setCode(defaultCode[newLang] || '');
-    setOutput('');
-    setProgramInputs('');
+    
+    // Only reset code if NOT skipping (i.e., manual language change, not from converter)
+    if (!skipCodeReset) {
+      setCode(defaultCode[newLang] || '');
+      setOutput('');
+      setProgramInputs('');
+    }
   };
 
   const handleStartEditing = async () => {
@@ -846,6 +851,7 @@ export default function Client() {
             lang={lang}
             code={code}
             setCode={handleCodeChange}
+            setLang={setLang}
             extensions={extensions}
             copyCode={copyCode}
             isCopied={isCopied}

@@ -9,6 +9,7 @@ import { go } from "@codemirror/lang-go";
 import { rust } from "@codemirror/lang-rust";
 import { php } from "@codemirror/lang-php";
 import { Code, Check, Copy, RotateCcw, Download, Play, Lock, Pause, Plus, Save, Edit3, X } from 'lucide-react';
+import { CodeConverter } from './CodeConverter';
 
 // Language extension mapping
 const getLanguageExtension = (lang) => {
@@ -78,6 +79,7 @@ export const CodeEditor = ({
   lang,
   code,
   setCode,
+  setLang,
   copyCode,
   isCopied,
   resetCode,
@@ -86,7 +88,6 @@ export const CodeEditor = ({
   isRunning,
   readOnly = false,
   isCollaborating = false,
-  // New props for save/new functionality
   user,
   currentCodeId,
   isEditingSavedCode,
@@ -127,10 +128,8 @@ export const CodeEditor = ({
       return;
     }
     
-    // Call saveCode and wait for it
     await saveCode();
     
-    // Auto-close the save dialog after 10ms
     setTimeout(() => {
       setShowSaveDialog(false);
     }, 10);
@@ -142,6 +141,26 @@ export const CodeEditor = ({
     } else if (e.key === 'Escape') {
       setShowSaveDialog(false);
       setCodeTitle('');
+    }
+  };
+
+  const handleCodeConverted = (convertedCode, targetLang) => {
+    console.log('=== Code Conversion Complete ===');
+    console.log('Target language:', targetLang);
+    console.log('Converted code length:', convertedCode.length);
+    console.log('Converted code preview:', convertedCode.substring(0, 150));
+    
+    // First update the code
+    setCode(convertedCode);
+    
+    // Then update the language if setLang is available
+    if (setLang && typeof setLang === 'function') {
+      // Pass true as second parameter to skip code reset in Client.jsx
+      setLang(targetLang, true);
+      alert(`✅ Code successfully converted to ${targetLang}!`);
+    } else {
+      console.error('setLang is not available or not a function');
+      alert('⚠️ Code converted but language could not be changed. Please select the language manually.');
     }
   };
 
@@ -214,7 +233,6 @@ export const CodeEditor = ({
               </div>
             </div>
             
-            {/* Save Status */}
             {showSaveMessage && (
               <div className="mt-2">
                 <div className={`inline-block px-3 py-1 rounded text-sm ${
@@ -237,7 +255,6 @@ export const CodeEditor = ({
           <span className="font-medium">Editor</span>
           <span className="text-sm text-gray-500">({lang})</span>
           
-          {/* Read-only indicator */}
           {readOnly && (
             <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-100 border border-orange-300 rounded text-orange-700 text-xs">
               <Lock className="w-3 h-3" />
@@ -245,7 +262,6 @@ export const CodeEditor = ({
             </div>
           )}
 
-          {/* Collaboration indicator */}
           {isCollaborating && (
             <div className="flex items-center gap-1 px-2 py-0.5 bg-red-100 border border-red-300 rounded text-red-700 text-xs">
               <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
@@ -255,6 +271,17 @@ export const CodeEditor = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Code Converter Button */}
+          {!isEditingSavedCode && (
+            <CodeConverter
+              currentLang={lang}
+              currentCode={code}
+              onCodeConverted={handleCodeConverted}
+              setLang={setLang}
+              disabled={readOnly || !code.trim()}
+            />
+          )}
+
           {/* New Button */}
           <button
             onClick={createNewCode}
@@ -398,7 +425,6 @@ export const CodeEditor = ({
           background-color: #ffffff !important;
         }
 
-        /* Text selection - solid blue background only, keep text color from syntax highlighting */
         .code-editor-container .cm-content ::selection {
           background-color: #3b82f6 !important;
         }
@@ -415,7 +441,6 @@ export const CodeEditor = ({
           background-color: #3b82f6 !important;
         }
 
-        /* CodeMirror's native selection layer */
         .code-editor-container .cm-selectionLayer .cm-selectionBackground {
           background-color: #3b82f6 !important;
         }
@@ -424,7 +449,6 @@ export const CodeEditor = ({
           background-color: #3b82f6 !important;
         }
 
-        /* Force selection for all elements */
         .code-editor-container .cm-editor ::selection {
           background-color: #3b82f6 !important;
         }

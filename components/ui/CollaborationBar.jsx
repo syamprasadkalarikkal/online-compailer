@@ -222,11 +222,11 @@ export const CollaborationBar = ({
                         )}
                       </div>
                       
-                      {/* Tooltip */}
+                      {/* Tooltip - UPDATED TO SHOW NAME FIRST, THEN (You) */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
                         <div className="font-semibold">{profile.name || profile.email}</div>
-                        {isCurrentUser && <div className="text-gray-300">You</div>}
-                        {isActiveEditor && !isCurrentUser && <div className="text-amber-300">Currently editing</div>}
+                        {isCurrentUser && <div className="text-emerald-300">(You)</div>}
+                        {isActiveEditor && <div className="text-amber-300">Currently editing</div>}
                         {!isActiveEditor && !isCurrentUser && <div className="text-gray-300">Viewing</div>}
                         {collaborator.is_owner && <div className="text-yellow-300 flex items-center gap-1">
                           <Crown className="w-3 h-3" /> Owner

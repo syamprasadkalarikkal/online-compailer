@@ -289,7 +289,7 @@ export const CodeEditor = ({
               )}
             </button>
           ) : (
-            <div className="flex items-center gap-1 px-2 py-1.5 bg-gray-700/50 text-gray-400 rounded-lg text-sm">
+            <div className="flex items-center gap-1 px-2 py-1.5 bg-gray-700/50 text-black rounded-lg text-sm">
               <Lock className="w-4 h-4" />
               <span className="hidden sm:inline">Login to Save</span>
             </div>

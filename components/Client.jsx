@@ -1,4 +1,4 @@
-// Client.jsx - Enhanced with stdin management
+// Client.jsx - Production Version
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -64,8 +64,6 @@ export default function Client() {
   const [isRunning, setIsRunning] = useState(false);
   const [execTime, setExecTime] = useState(initialState?.execTime || 0);
   const [isCopied, setIsCopied] = useState(false);
-  
-  // NEW: State for managing program inputs
   const [programInputs, setProgramInputs] = useState(initialState?.programInputs || '');
   
   const abortControllerRef = useRef(null);
@@ -104,7 +102,6 @@ export default function Client() {
   const lastLocalUpdateRef = useRef(null);
   const stateRestoredRef = useRef(!!initialState);
 
-  // Save editor state to localStorage
   useEffect(() => {
     try {
       const editorState = {
@@ -121,14 +118,12 @@ export default function Client() {
       };
       localStorage.setItem('editorState', JSON.stringify(editorState));
     } catch (error) {
-      console.error('Failed to save editor state:', error);
+      // Silent fail in production
     }
   }, [currentCodeId, codeTitle, code, lang, output, execTime, isEditingSavedCode, isSharedCode, programInputs]);
 
-  // Initialize authentication
   useEffect(() => {
     if (!supabase) {
-      console.error('Supabase client not available during initialization');
       setLoading(false);
       return;
     }
@@ -136,13 +131,11 @@ export default function Client() {
     const getSession = async () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) {
-          console.error('Error getting session:', error);
-        } else {
+        if (!error) {
           setUser(session?.user ?? null);
         }
       } catch (error) {
-        console.error('Exception in getSession:', error);
+        // Silent fail in production
       } finally {
         setLoading(false);
       }
@@ -152,7 +145,6 @@ export default function Client() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth state changed:', event);
         setUser(session?.user ?? null);
         setLoading(false);
         
@@ -194,20 +186,16 @@ export default function Client() {
 
   useEffect(() => {
     if (remoteCode !== null && remoteCode !== lastLocalUpdateRef.current) {
-      console.log('Applying remote code update');
       setCode(remoteCode);
     }
   }, [remoteCode]);
 
   const loadUserCodes = async (currentUser = user) => {
     if (!currentUser || !supabase) {
-      console.log('Skipping loadUserCodes: missing user or supabase');
       return;
     }
     
     try {
-      console.log('Loading codes for user:', currentUser.id);
-      
       const { data: collaboratorRecords, error: collabError } = await supabase
         .from('collaborators')
         .select(`
@@ -228,7 +216,6 @@ export default function Client() {
         .order('saved_codes(updated_at)', { ascending: false });
       
       if (collabError) {
-        console.error('Error loading codes:', collabError);
         setSavedCodes([]);
         return;
       }
@@ -254,11 +241,9 @@ export default function Client() {
         new Date(b.updated_at) - new Date(a.updated_at)
       );
 
-      console.log('Loaded codes:', uniqueCodes.length);
       setSavedCodes(uniqueCodes);
       
     } catch (error) {
-      console.error('Exception loading codes:', error);
       setSavedCodes([]);
     }
   };
@@ -276,7 +261,7 @@ export default function Client() {
     try {
       localStorage.removeItem('editorState');
     } catch (error) {
-      console.error('Failed to clear editor state:', error);
+      // Silent fail
     }
     
     setCurrentCodeId(null);
@@ -288,8 +273,6 @@ export default function Client() {
     setIsEditingSavedCode(false);
     setIsSharedCode(false);
     stateRestoredRef.current = false;
-    
-    console.log('New code created');
   };
 
   const copyCode = async () => {
@@ -298,7 +281,7 @@ export default function Client() {
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
     } catch (err) {
-      console.error('Failed to copy code:', err);
+      // Silent fail
     }
   };
 
@@ -318,13 +301,11 @@ export default function Client() {
       element.click();
       document.body.removeChild(element);
     } catch (error) {
-      console.error('Failed to download code:', error);
+      // Silent fail
     }
   };
 
-  // NEW: Handler for input changes
   const handleInputsChange = (newInputs) => {
-    console.log('Program inputs updated:', newInputs);
     setProgramInputs(newInputs);
   };
 
@@ -334,15 +315,9 @@ export default function Client() {
     setExecTime(0);
     
     const startTime = Date.now();
-    
     abortControllerRef.current = new AbortController();
     
     try {
-      console.log('=== Running Code ===');
-      console.log('Language:', lang);
-      console.log('Code length:', code.length);
-      console.log('Program inputs:', programInputs ? `${programInputs.length} chars` : 'none');
-      
       const response = await fetch('/api/execute', {
         method: 'POST',
         headers: {
@@ -358,14 +333,11 @@ export default function Client() {
 
       if (response.ok) {
         const result = await response.json();
-        console.log('Execution result:', result);
-        
         setOutput(result.output || result.error || 'No output');
         setExecTime(result.executionTime || Date.now() - startTime);
         setIsRunning(false);
       } else {
         const errorText = await response.text();
-        console.error('Execution failed:', errorText);
         setOutput(`Error: ${errorText || 'Execution failed'}`);
         setExecTime(Date.now() - startTime);
         setIsRunning(false);
@@ -375,7 +347,6 @@ export default function Client() {
       if (error.name === 'AbortError') {
         setOutput('Execution cancelled');
       } else {
-        console.error('Execution error:', error);
         setOutput(`Error: ${error.message || 'Failed to execute code'}`);
       }
       setExecTime(Date.now() - startTime);
@@ -433,8 +404,6 @@ export default function Client() {
       };
 
       if (currentCodeId) {
-        console.log('Updating existing code:', currentCodeId);
-        
         const { data, error } = await supabase
           .from('saved_codes')
           .update(codeData)
@@ -443,7 +412,6 @@ export default function Client() {
           .single();
         
         if (error) {
-          console.error('Update error:', error);
           throw new Error(`Failed to update code: ${error.message}`);
         }
         
@@ -455,8 +423,6 @@ export default function Client() {
         setSaveMessage('Code updated successfully!');
         
       } else {
-        console.log('Creating new code');
-        
         const { data, error } = await supabase
           .from('saved_codes')
           .insert([codeData])
@@ -464,7 +430,6 @@ export default function Client() {
           .single();
         
         if (error) {
-          console.error('Insert error:', error);
           throw new Error(`Failed to save code: ${error.message}`);
         }
         
@@ -479,7 +444,7 @@ export default function Client() {
           }]);
 
         if (collabError) {
-          console.error('Collaborator insert error:', collabError);
+          // Silent fail for collaborator insert
         }
         
         setSavedCodes(prev => [{ ...data, is_owned: true, is_shared: false }, ...prev]);
@@ -497,7 +462,6 @@ export default function Client() {
       }, 2000);
       
     } catch (error) {
-      console.error('Save error:', error);
       setSaveMessage(error.message || 'Failed to save code');
       setShowSaveMessage(true);
       setTimeout(() => setShowSaveMessage(false), 5000);
@@ -508,15 +472,12 @@ export default function Client() {
 
   const loadCode = async (savedCode) => {
     if (!savedCode || !savedCode.id) {
-      console.error('Invalid saved code data');
       return;
     }
 
     if (currentUserEditing) {
       await stopEditing();
     }
-    
-    console.log('Loading code:', savedCode.id);
     
     setCurrentCodeId(savedCode.id);
     setCodeTitle(savedCode.title || 'Untitled');
@@ -544,19 +505,16 @@ export default function Client() {
       };
       localStorage.setItem('editorState', JSON.stringify(editorState));
     } catch (error) {
-      console.error('Failed to save editor state:', error);
+      // Silent fail
     }
   };
 
   const renameCode = async (codeId, newName) => {
     if (!supabase || !newName || !newName.trim()) {
-      console.error('Invalid rename parameters');
       return;
     }
 
     try {
-      console.log('Renaming code:', codeId, 'to:', newName);
-      
       const { data, error } = await supabase
         .from('saved_codes')
         .update({ 
@@ -568,7 +526,6 @@ export default function Client() {
         .single();
       
       if (error) {
-        console.error('Rename error:', error);
         throw error;
       }
       
@@ -583,22 +540,17 @@ export default function Client() {
       }
       
       setEditingCodeName(null);
-      console.log('Code renamed successfully');
     } catch (error) {
-      console.error('Failed to rename code:', error);
       alert('Failed to rename code. Please try again.');
     }
   };
 
   const deleteCode = async (codeId) => {
     if (!supabase || !user) {
-      console.error('Cannot delete: missing supabase or user');
       return;
     }
 
     try {
-      console.log('Deleting code:', codeId);
-      
       const { error } = await supabase
         .from('saved_codes')
         .delete()
@@ -606,7 +558,6 @@ export default function Client() {
         .eq('user_id', user.id);
       
       if (error) {
-        console.error('Delete error:', error);
         throw error;
       }
       
@@ -615,29 +566,22 @@ export default function Client() {
       if (currentCodeId === codeId) {
         createNewCode();
       }
-      
-      console.log('Code deleted successfully');
     } catch (error) {
-      console.error('Failed to delete code:', error);
       alert('Failed to delete code. Please try again.');
     }
   };
 
   const handleLogout = async () => {
     if (!supabase) {
-      console.error('Cannot logout: supabase not available');
       return;
     }
 
     try {
-      console.log('Logging out user');
-      
       if (currentUserEditing) {
         await stopEditing();
       }
       
       localStorage.removeItem('editorState');
-      
       await supabase.auth.signOut();
       
       setLang('javascript');
@@ -649,10 +593,8 @@ export default function Client() {
       setCodeTitle('');
       setIsEditingSavedCode(false);
       setIsSharedCode(false);
-      
-      console.log('Logout successful');
     } catch (error) {
-      console.error('Error logging out:', error);
+      // Silent fail
     }
   };
 
@@ -663,10 +605,9 @@ export default function Client() {
       const { data, error } = await supabase.auth.getSession();
       if (!error && data.session) {
         setUser(data.session.user);
-        console.log('User data refreshed');
       }
     } catch (error) {
-      console.error('Error refreshing user data:', error);
+      // Silent fail
     }
   };
 
@@ -677,14 +618,11 @@ export default function Client() {
     }
     
     if (!request || !request.code_id) {
-      console.error('Invalid collaboration request');
       alert('Invalid collaboration request');
       return;
     }
     
     try {
-      console.log('Accepting collaboration for code:', request.code_id);
-      
       const { data: codeData, error } = await supabase
         .from('saved_codes')
         .select('*')
@@ -692,13 +630,11 @@ export default function Client() {
         .maybeSingle();
 
       if (error) {
-        console.error('Error loading shared code:', error);
         alert(`Failed to load shared code: ${error.message || 'Unknown error'}`);
         return;
       }
 
       if (!codeData) {
-        console.warn('Code not found:', request.code_id);
         alert('Code not found or you no longer have access');
         return;
       }
@@ -718,11 +654,8 @@ export default function Client() {
       stateRestoredRef.current = false;
       
       await loadUserCodes();
-      
-      console.log('Collaboration accepted successfully');
       alert(`Now collaborating on "${codeData.title}"!`);
     } catch (error) {
-      console.error('Exception accepting collaboration:', error);
       alert('Failed to accept collaboration request');
     }
   };
@@ -743,7 +676,6 @@ export default function Client() {
   };
 
   const handleLanguageChange = (newLang, skipCodeReset = false) => {
-    // Skip the saved code check if this is coming from the converter
     if (!skipCodeReset && isEditingSavedCode) {
       alert('Cannot change language while editing a saved code. Click "New" to start fresh.');
       return;
@@ -751,7 +683,6 @@ export default function Client() {
     
     setLang(newLang);
     
-    // Only reset code if NOT skipping (i.e., manual language change, not from converter)
     if (!skipCodeReset) {
       setCode(defaultCode[newLang] || '');
       setOutput('');
@@ -781,7 +712,6 @@ export default function Client() {
 
   const handleRemoveCollaborator = async (userId) => {
     if (!userId) {
-      console.error('Invalid userId for remove operation');
       return false;
     }
     
@@ -833,9 +763,7 @@ export default function Client() {
         />
       )}
 
-      {/* Main Content Area with Left Sidebar */}
       <div className="flex-1 flex min-h-0">
-        {/* Left Sidebar for Language Selector */}
         <div className="w-16 bg-white border-r border-gray-700 flex flex-col items-center py-4 overflow-y-auto">
           <LanguageSelector
             lang={lang}
@@ -845,7 +773,6 @@ export default function Client() {
           />
         </div>
 
-        {/* Editor and Output Area */}
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-2 min-h-0">
           <CodeEditor
             lang={lang}

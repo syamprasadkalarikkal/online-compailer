@@ -1,9 +1,13 @@
-// components/UserMenu.jsx - Fixed with isLoading state and duplicate useEffect removed
+// components/UserMenu.jsx
 import React, { useRef, useEffect, useState } from 'react';
 import { User, Code, Settings, LogOut } from 'lucide-react';
 import { SavedCodes } from './SavedCodes';
 import { ProfileSettings } from './ProfileSettings';
 
+/**
+ * User menu component with profile management and saved codes
+ * Displays user information, saved codes list, and profile settings
+ */
 export const UserMenu = ({
   showUserMenu,
   setShowUserMenu,
@@ -21,7 +25,6 @@ export const UserMenu = ({
 }) => {
   const menuRef = useRef(null);
   const [activeView, setActiveView] = useState('profile');
-  // Initialize with user data immediately to avoid blank state
   const [profileData, setProfileData] = useState({
     name: user?.email?.split('@')[0] || '',
     profilePicture: user?.user_metadata?.avatar_url || null,
@@ -33,19 +36,21 @@ export const UserMenu = ({
   const [dbError, setDbError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Load user profile data immediately on mount and when user changes
+  /**
+   * Load user profile on mount and when user changes
+   */
   useEffect(() => {
     if (user && supabase) {
-      console.log('User detected, loading profile immediately');
       loadUserProfile();
       checkStorageAvailability();
     }
   }, [user?.id]);
 
-  // Reload profile data when menu opens to ensure fresh data
+  /**
+   * Reload profile when menu opens to ensure fresh data
+   */
   useEffect(() => {
     if (showUserMenu && user && supabase) {
-      console.log('Menu opened, reloading profile');
       loadUserProfile();
     }
     if (!showUserMenu) {
@@ -53,7 +58,9 @@ export const UserMenu = ({
     }
   }, [showUserMenu, user?.id, supabase]);
 
-  // Close menu when clicking outside
+  /**
+   * Close menu when clicking outside
+   */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (menuRef.current && !menuRef.current.contains(event.target)) {
@@ -68,6 +75,9 @@ export const UserMenu = ({
     }
   }, [showUserMenu, setShowUserMenu]);
 
+  /**
+   * Checks if Supabase storage is available for profile pictures
+   */
   const checkStorageAvailability = async () => {
     if (!supabase) {
       setStorageAvailable(false);
@@ -77,37 +87,33 @@ export const UserMenu = ({
     try {
       const { data, error } = await supabase.storage.listBuckets();
       if (error) {
-        console.warn('Storage not available:', error);
         setStorageAvailable(false);
         return;
       }
       
       const profileBucket = data.find(bucket => bucket.name === 'profile-pictures');
       setStorageAvailable(!!profileBucket);
-      
-      if (!profileBucket) {
-        console.warn('profile-pictures bucket not found. Image uploads will be disabled.');
-      }
     } catch (error) {
-      console.warn('Storage check failed:', error);
       setStorageAvailable(false);
     }
   };
 
+  /**
+   * Loads user profile data from database
+   * Falls back to auth metadata if database record doesn't exist
+   */
   const loadUserProfile = async () => {
     if (!supabase || !user) {
-      console.log('Cannot load profile - missing supabase or user');
       setIsLoading(false);
       return;
     }
     
-    console.log('Loading user profile for user ID:', user.id);
     setIsLoading(true);
     
     try {
       setDbError(null);
       
-      // First set fallback data immediately to avoid blank state
+      // Set fallback data immediately to avoid blank state
       const fallbackData = {
         name: user.email?.split('@')[0] || user.user_metadata?.full_name || '',
         profilePicture: user.user_metadata?.avatar_url || null,
@@ -117,30 +123,21 @@ export const UserMenu = ({
       
       setProfileData(fallbackData);
       
-      // Then fetch from database
+      // Fetch from database
       const { data: existingUser, error: fetchError } = await supabase
         .from('users')
         .select('id, user_id, name, avatar_url, bio, email')
         .eq('user_id', user.id)
         .maybeSingle();
 
-      console.log('Database query result:', { existingUser, fetchError });
-
       if (fetchError) {
-        console.error('Database error loading profile:', fetchError);
+        console.error('Error loading profile:', fetchError.message);
         setDbError('Database connection issue. Some features may be limited.');
         setIsLoading(false);
         return;
       }
 
       if (existingUser) {
-        // User record exists, update with database data
-        console.log('Successfully loaded user profile from database:', {
-          name: existingUser.name,
-          avatar_url: existingUser.avatar_url,
-          bio: existingUser.bio
-        });
-        
         setUserRecord(existingUser);
         
         const newProfileData = {
@@ -150,27 +147,24 @@ export const UserMenu = ({
           bio: existingUser.bio || ''
         };
         
-        console.log('Updating profile data to:', newProfileData);
         setProfileData(newProfileData);
       } else {
-        // No record exists yet
-        console.log('No user record found in database, using fallback data');
         setUserRecord(null);
       }
     } catch (error) {
-      console.error('Unexpected error loading user profile:', error);
+      console.error('Error loading user profile:', error);
       setDbError('Database connection issue. Some features may be limited.');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Function to reload profile - passed to ProfileSettings
+  /**
+   * Callback after profile update to reload data
+   */
   const handleProfileUpdate = async () => {
-    console.log('Profile updated, reloading data...');
     await loadUserProfile();
     
-    // Also call parent's onUserUpdate if provided
     if (onUserUpdate) {
       onUserUpdate();
     }
@@ -178,16 +172,19 @@ export const UserMenu = ({
 
   if (!showUserMenu) return null;
 
+  /**
+   * Renders the main profile view with user info and menu options
+   */
   const renderProfileView = () => (
     <div className="p-4">
-      {/* Database Error Warning */}
+      {/* Database error warning */}
       {dbError && (
         <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
           <p className="text-yellow-800 text-xs">{dbError}</p>
         </div>
       )}
 
-      {/* User Info Section */}
+      {/* User info section */}
       <div className="flex items-center gap-3 mb-6">
         <div className="relative">
           {profileData?.profilePicture ? (
@@ -197,7 +194,6 @@ export const UserMenu = ({
               alt="Profile" 
               className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
               onError={(e) => {
-                console.log('Image failed to load:', profileData.profilePicture);
                 e.target.style.display = 'none';
                 e.target.nextElementSibling.style.display = 'flex';
               }}
@@ -234,7 +230,7 @@ export const UserMenu = ({
         </div>
       )}
 
-      {/* Menu Options */}
+      {/* Menu options */}
       <div className="space-y-2">
         <button
           onClick={() => setActiveView('savedCodes')}
@@ -268,6 +264,9 @@ export const UserMenu = ({
     </div>
   );
 
+  /**
+   * Returns content based on active view
+   */
   const getViewContent = () => {
     switch (activeView) {
       case 'profile':

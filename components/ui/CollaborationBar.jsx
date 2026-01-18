@@ -1,7 +1,10 @@
-// components/CollaborationBar.jsx - PROFESSIONAL UI WITH PROFILE IMAGES - UPDATED
 import React, { useState, useEffect } from 'react';
 import { Users, Edit3, UserCheck, Crown, Lock, X, AlertCircle, Eye } from 'lucide-react';
 
+/**
+ * Collaboration bar showing active editors and edit controls
+ * Displays avatars, status indicators, and edit lock management
+ */
 export const CollaborationBar = ({
   collaborators,
   activeEditors,
@@ -18,7 +21,9 @@ export const CollaborationBar = ({
   const [loading, setLoading] = useState(true);
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(null);
 
-  // Load user profiles with avatars for all collaborators AND active editors
+  /**
+   * Load user profiles with avatars for all collaborators and active editors
+   */
   useEffect(() => {
     const loadProfiles = async () => {
       if (!supabase) {
@@ -27,7 +32,6 @@ export const CollaborationBar = ({
       }
 
       try {
-        // Collect all unique user IDs from both collaborators and activeEditors
         const collabUserIds = collaborators?.map(c => c.user_id).filter(Boolean) || [];
         const editorUserIds = activeEditors?.map(e => e.user_id).filter(Boolean) || [];
         const allUserIds = [...new Set([...collabUserIds, ...editorUserIds])];
@@ -57,8 +61,6 @@ export const CollaborationBar = ({
     };
 
     loadProfiles();
-    
-    // Reload profiles when collaborators or activeEditors change
   }, [collaborators, activeEditors, supabase]);
 
   const handleEditToggle = async () => {
@@ -67,12 +69,10 @@ export const CollaborationBar = ({
         await stopEditing();
       } else {
         if (isLocked) {
-          alert(' Someone else is currently editing. Please wait for them to finish.');
+          alert('Someone else is currently editing. Please wait for them to finish.');
           return;
         }
-        
-        const success = await startEditing();
-        
+        await startEditing();
       }
     } catch (error) {
       console.error('Error toggling edit mode:', error);
@@ -85,7 +85,7 @@ export const CollaborationBar = ({
     
     const success = await removeCollaborator(collaboratorUserId);
     if (success) {
-      alert(' Collaborator removed successfully');
+      alert('Collaborator removed successfully');
       setShowRemoveConfirm(null);
     } else {
       alert('Failed to remove collaborator');
@@ -114,12 +114,7 @@ export const CollaborationBar = ({
   const validCollaborators = collaborators?.filter(c => c.user_id) || [];
   const whoIsEditing = activeEditors?.find(e => e.user_id !== user?.id);
 
-  if (loading || validCollaborators.length === 0) {
-    return null;
-  }
-
-  // Only show if there are multiple collaborators
-  if (validCollaborators.length === 1) {
+  if (loading || validCollaborators.length === 0 || validCollaborators.length === 1) {
     return null;
   }
 
@@ -127,9 +122,8 @@ export const CollaborationBar = ({
     <div className="relative z-50 bg-white backdrop-blur-sm border-b border-gray-600">
       <div className="max-w-screen-2xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between flex-wrap gap-4">
-          {/* Left side - Collaborators Section */}
+          {/* Collaborators section */}
           <div className="flex items-center gap-6">
-            {/* Collaborators Count Badge */}
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg">
                 <Users className="w-5 h-5 text-black" />
@@ -142,10 +136,9 @@ export const CollaborationBar = ({
               </div>
             </div>
 
-            {/* Vertical Divider */}
             <div className="h-12 w-px bg-purple-600/50" />
 
-            {/* Collaborators Avatars */}
+            {/* Collaborator avatars */}
             <div className="flex items-center">
               <div className="flex items-center -space-x-3">
                 {validCollaborators.map((collaborator, index) => {
@@ -159,7 +152,6 @@ export const CollaborationBar = ({
                       className="relative group"
                       style={{ zIndex: validCollaborators.length - index }}
                     >
-                      {/* Avatar */}
                       <div className={`relative w-11 h-11 rounded-full ring-3 transition-all duration-200 ${
                         isCurrentUser
                           ? 'ring-emerald-400 hover:ring-emerald-500'
@@ -172,7 +164,6 @@ export const CollaborationBar = ({
                             src={profile.avatar_url} 
                             alt={profile.name || profile.email}
                             className="w-full h-full rounded-full object-cover bg-gray-100"
-                            key={`${collaborator.user_id}-${isActiveEditor}`}
                             onError={(e) => {
                               e.target.style.display = 'none';
                               const fallbackDiv = e.target.nextSibling;
@@ -196,21 +187,18 @@ export const CollaborationBar = ({
                           {getInitials(collaborator)}
                         </div>
                         
-                        {/* Status Indicator */}
                         {isActiveEditor && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-amber-400 rounded-full border-2 border-white animate-pulse flex items-center justify-center">
                             <Edit3 className="w-2 h-2 text-white" />
                           </div>
                         )}
 
-                        {/* Owner Crown */}
                         {collaborator.is_owner && (
                           <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-full border-2 border-white flex items-center justify-center shadow-sm">
                             <Crown className="w-2.5 h-2.5 text-white" />
                           </div>
                         )}
 
-                        {/* Remove Button (owner only) */}
                         {isOwner && !isCurrentUser && !collaborator.is_owner && (
                           <button
                             onClick={() => setShowRemoveConfirm(collaborator.user_id)}
@@ -222,7 +210,7 @@ export const CollaborationBar = ({
                         )}
                       </div>
                       
-                      {/* Tooltip - UPDATED TO SHOW NAME FIRST, THEN (You) */}
+                      {/* Tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
                         <div className="font-semibold">{profile.name || profile.email}</div>
                         {isCurrentUser && <div className="text-emerald-300">(You)</div>}
@@ -240,9 +228,8 @@ export const CollaborationBar = ({
             </div>
           </div>
 
-          {/* Right side - Status & Actions */}
+          {/* Status & actions */}
           <div className="flex items-center gap-3">
-            {/* Status Badge */}
             {currentUserIsEditing ? (
               <div className="flex items-center gap-2 px-4 py-2 bg-emerald-500/20 border border-emerald-400/50 rounded-lg backdrop-blur-sm">
                 <div className="w-2 h-2 bg-emerald-400 rounded-full animate-pulse" />
@@ -263,7 +250,6 @@ export const CollaborationBar = ({
               </div>
             )}
 
-            {/* Edit Control Button */}
             <button
               onClick={handleEditToggle}
               disabled={!user || (isLocked && !currentUserIsEditing)}
@@ -294,10 +280,9 @@ export const CollaborationBar = ({
             </button>
           </div>
         </div>
-
       </div>
 
-      {/* Remove Confirmation Modal */}
+      {/* Remove confirmation modal */}
       {showRemoveConfirm && (
         <>
           <div 

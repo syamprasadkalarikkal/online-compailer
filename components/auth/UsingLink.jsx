@@ -13,6 +13,7 @@ export default function UsingLink() {
   const [otpSent, setOtpSent] = useState(false);
   const router = useRouter();
 
+  // Redirect if already logged in
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -35,14 +36,12 @@ export default function UsingLink() {
       });
 
       if (error) {
-        console.error('OTP login error:', error);
         setError(error.message);
       } else {
         setMessage('Check your email for the magic link!');
         setOtpSent(true);
       }
     } catch (err) {
-      console.error('Unexpected error:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
@@ -101,7 +100,7 @@ export default function UsingLink() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3  bg-white/5 border border-gray-200 text-black placeholder-gray-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  className="w-full pl-11 pr-4 py-3 bg-white/5 border border-gray-200 text-black placeholder-gray-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
                   required
                   disabled={isLoading}
                 />

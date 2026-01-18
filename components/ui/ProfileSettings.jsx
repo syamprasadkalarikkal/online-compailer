@@ -1,4 +1,3 @@
-// components/ProfileSettings.jsx - Without local storage fallback
 import React, { useState, useRef } from 'react';
 import { Camera, Save, X, User, Mail, FileText } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
@@ -19,7 +18,7 @@ export const ProfileSettings = ({
   const [success, setSuccess] = useState(null);
   const fileInputRef = useRef(null);
 
-  // Load profile data on mount
+  // Load user profile data from database
   React.useEffect(() => {
     const loadProfile = async () => {
       if (!user || !supabase) return;
@@ -32,9 +31,8 @@ export const ProfileSettings = ({
           .single();
 
         if (error) {
-          // If no record exists yet, that's okay
           if (error.code !== 'PGRST116') {
-            console.error('Error loading profile:', error);
+            // Error other than "no record found"
           }
           return;
         }
@@ -48,13 +46,14 @@ export const ProfileSettings = ({
           });
         }
       } catch (error) {
-        console.error('Error loading profile:', error);
+        // Silent fail
       }
     };
 
     loadProfile();
   }, [user, supabase, setProfileData, setUserRecord]);
 
+  // Handle profile picture upload to Supabase Storage
   const handleImageUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) return;
@@ -104,7 +103,7 @@ export const ProfileSettings = ({
         return;
       }
 
-      // Get public URL
+      // Get public URL for the uploaded image
       const { data: urlData } = supabase.storage
         .from('profile-pictures')
         .getPublicUrl(filePath);
@@ -116,7 +115,7 @@ export const ProfileSettings = ({
         return;
       }
 
-      // Update local state immediately
+      // Update local state
       setProfileData(prev => ({
         ...prev,
         profilePicture: newAvatarUrl
@@ -131,10 +130,11 @@ export const ProfileSettings = ({
     }
   };
 
+  // Save profile data to database
   const handleSave = async () => {
     if (!user) return;
 
-    // Validate required data
+    // Validate required fields
     if (!profileData?.name?.trim()) {
       setError('Name is required');
       return;
@@ -150,14 +150,14 @@ export const ProfileSettings = ({
     setSuccess(null);
 
     try {
-      // Verify authentication
+      // Verify user authentication
       const { data: { user: currentUser }, error: authError } = await supabase.auth.getUser();
       
       if (authError || !currentUser) {
         throw new Error('Authentication error. Please log in again.');
       }
 
-      // Prepare data for save
+      // Prepare profile data for save
       const updatedData = {
         name: profileData.name.trim(),
         avatar_url: profileData.profilePicture,
@@ -168,7 +168,7 @@ export const ProfileSettings = ({
       let result;
 
       if (userRecord) {
-        // Update existing record
+        // Update existing profile
         result = await supabase
           .from('users')
           .update(updatedData)
@@ -178,13 +178,12 @@ export const ProfileSettings = ({
           .single();
 
         if (result.error) {
-          console.error('Update error:', result.error);
           throw new Error(`Failed to update profile: ${result.error.message}`);
         }
 
         setUserRecord(result.data);
       } else {
-        // Create new record
+        // Create new profile
         const newUserData = {
           user_id: currentUser.id,
           email: currentUser.email,
@@ -198,8 +197,6 @@ export const ProfileSettings = ({
           .single();
 
         if (result.error) {
-          console.error('Insert error:', result.error);
-          
           if (result.error.code === '23505') {
             throw new Error('Profile already exists. Please refresh the page.');
           } else if (result.error.code === '42501') {
@@ -212,7 +209,7 @@ export const ProfileSettings = ({
         setUserRecord(result.data);
       }
 
-      // Update local state
+      // Update local state with saved data
       setProfileData(prev => ({
         ...prev,
         name: result.data.name,
@@ -226,6 +223,7 @@ export const ProfileSettings = ({
 
       setSuccess('Profile saved successfully!');
       
+      // Return to profile view after save
       setTimeout(() => {
         setActiveView('profile');
       }, 1500);
@@ -239,7 +237,7 @@ export const ProfileSettings = ({
 
   return (
     <div>
-      {/* Header with back button */}
+      {/* Header */}
       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
         <button
           onClick={() => setActiveView('profile')}
@@ -257,28 +255,26 @@ export const ProfileSettings = ({
 
       {/* Profile Settings Form */}
       <div className="p-4 space-y-6">
-        {/* Error Message */}
+        {/* Status Messages */}
         {error && (
           <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
             <p className="text-red-800 text-sm">{error}</p>
           </div>
         )}
 
-        {/* Success Message */}
         {success && (
           <div className="p-3 bg-green-50 border border-green-200 rounded-lg">
             <p className="text-green-800 text-sm">{success}</p>
           </div>
         )}
 
-        {/* Saving Message */}
         {saving && !error && !success && (
           <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-blue-800 text-sm">Saving your profile...</p>
           </div>
         )}
 
-        {/* Profile Picture Section */}
+        {/* Profile Picture Upload */}
         <div className="flex flex-col items-center gap-4">
           <div className="relative">
             {profileData.profilePicture ? (
@@ -298,7 +294,7 @@ export const ProfileSettings = ({
               <User className="w-10 h-10 text-white" />
             </div>
             
-            {/* Camera overlay - Only show if storage is available */}
+            {/* Camera button for upload (only if storage available) */}
             {storageAvailable && (
               <button
                 onClick={() => fileInputRef.current?.click()}
@@ -329,7 +325,7 @@ export const ProfileSettings = ({
           )}
         </div>
 
-        {/* Name Field */}
+        {/* Display Name Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <User className="w-4 h-4 inline mr-2" />
@@ -349,7 +345,7 @@ export const ProfileSettings = ({
           />
         </div>
 
-        {/* Email Field (Read-only) */}
+        {/* Email Display (Read-only) */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <Mail className="w-4 h-4 inline mr-2" />
@@ -364,7 +360,7 @@ export const ProfileSettings = ({
           <p className="text-xs text-gray-500 mt-1">Email cannot be changed here</p>
         </div>
 
-        {/* Bio Field */}
+        {/* Bio Input */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
             <FileText className="w-4 h-4 inline mr-2" />
@@ -383,7 +379,7 @@ export const ProfileSettings = ({
           </p>
         </div>
 
-        {/* Save Button */}
+        {/* Action Buttons */}
         <div className="flex gap-3 pt-4">
           <button
             onClick={handleSave}
@@ -412,7 +408,7 @@ export const ProfileSettings = ({
           </button>
         </div>
 
-        {/* Database Status Info */}
+        {/* Database Connection Warning */}
         {!supabase && (
           <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
             <p className="text-yellow-800 text-sm">
@@ -421,7 +417,6 @@ export const ProfileSettings = ({
           </div>
         )}
 
-        {/* Optional Profile Picture Note */}
         <div className="text-xs text-gray-500 text-center">
           Profile picture is optional. You can save your profile without uploading an image.
         </div>

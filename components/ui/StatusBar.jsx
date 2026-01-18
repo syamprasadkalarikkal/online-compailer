@@ -1,10 +1,14 @@
-// components/StatusBar.jsx - Bottom Status Bar with Profile Picture
+
 import React, { useState, useEffect } from 'react';
 import { User } from 'lucide-react';
 import { UserMenu } from './UserMenu';
 import { CollaborationRequests } from './CollaborationRequests';
 import { CollaborationButton } from './CollaborationButton';
 
+/**
+ * Bottom status bar displaying code stats and user controls
+ * Shows language, line count, execution status, and collaboration tools
+ */
 export const StatusBar = ({
   lang,
   code,
@@ -31,13 +35,18 @@ export const StatusBar = ({
   const [profilePicture, setProfilePicture] = useState(null);
   const [userName, setUserName] = useState('');
 
-  // Load user profile data
+  /**
+   * Load user profile data on mount
+   */
   useEffect(() => {
     if (user && supabase) {
       loadUserProfile();
     }
   }, [user?.id, supabase]);
 
+  /**
+   * Fetches user profile including avatar
+   */
   const loadUserProfile = async () => {
     if (!supabase || !user) return;
     
@@ -52,7 +61,6 @@ export const StatusBar = ({
         setProfilePicture(data.avatar_url);
         setUserName(data.name);
       } else {
-        // Fallback to user email
         setUserName(user.email?.split('@')[0] || 'User');
         setProfilePicture(null);
       }
@@ -63,7 +71,9 @@ export const StatusBar = ({
     }
   };
 
-  // Reload profile when menu opens to ensure fresh data
+  /**
+   * Reload profile when menu opens
+   */
   useEffect(() => {
     if (showUserMenu && user && supabase) {
       loadUserProfile();
@@ -95,7 +105,6 @@ export const StatusBar = ({
           
           {user ? (
             <div className="flex items-center gap-3">
-              {/* Collaboration Button */}
               <CollaborationButton
                 currentCodeId={currentCodeId}
                 codeTitle={codeTitle}
@@ -103,14 +112,13 @@ export const StatusBar = ({
                 supabase={supabase}
               />
 
-              {/* Collaboration Requests */}
               <CollaborationRequests
                 user={user}
                 supabase={supabase}
                 onAcceptRequest={onAcceptCollaboration}
               />
 
-              {/* User Menu with Profile Picture */}
+              {/* User menu with profile picture */}
               <div className="relative">
                 <button
                   onClick={() => setShowUserMenu(!showUserMenu)}
@@ -165,4 +173,4 @@ export const StatusBar = ({
       </div>
     </footer>
   );
-}
+};

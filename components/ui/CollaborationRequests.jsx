@@ -1,7 +1,10 @@
-// components/CollaborationRequests.jsx - COMPLETE UPDATED VERSION WITH AVATAR SUPPORT
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Check, X, Inbox, ChevronRight } from 'lucide-react';
 
+/**
+ * Displays pending collaboration requests
+ * Handles accepting/declining requests with real-time updates
+ */
 export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -11,6 +14,9 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
 
+  /**
+   * Set up real-time subscriptions and load initial requests
+   */
   useEffect(() => {
     if (user && supabase) {
       loadRequests();
@@ -31,18 +37,19 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
           table: 'collaboration_requests',
           filter: `recipient_id=eq.${user.id}`
         }, () => {
-          
           loadRequests();
         })
-        
+        .subscribe();
 
       return () => {
-        
         channel.unsubscribe();
       };
     }
   }, [user, supabase]);
 
+  /**
+   * Close panel when clicking outside
+   */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showPanel && 
@@ -61,13 +68,13 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
     };
   }, [showPanel]);
 
+  /**
+   * Loads all pending collaboration requests
+   */
   const loadRequests = async () => {
     if (!user || !supabase) return;
 
-    
-
     try {
-      // Fetch all pending requests - now includes sender_avatar_url
       const { data: requestsData, error: requestsError } = await supabase
         .from('collaboration_requests')
         .select('*')
@@ -76,32 +83,29 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
         .order('created_at', { ascending: false });
 
       if (requestsError) {
-        
-        
         throw requestsError;
       }
 
-      
       setRequests(requestsData || []);
     } catch (error) {
-      
+      console.error('Error loading requests:', error);
       setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
+  /**
+   * Handles accepting or declining a collaboration request
+   */
   const handleRequest = async (request, action) => {
     if (!supabase) return;
 
     setProcessing(request.id);
 
     try {
-      
-
       if (action === 'accepted') {
-        
-
+        // Add user as collaborator
         const { error: collabError } = await supabase
           .from('collaborators')
           .insert([{
@@ -112,13 +116,11 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
             last_active: new Date().toISOString()
           }]);
 
-        if (collabError) {
-          if (collabError.code !== '23505') {
-            
-            throw new Error('Failed to add you as a collaborator: ' + collabError.message);
-          }
+        if (collabError && collabError.code !== '23505') {
+          throw new Error('Failed to add you as a collaborator: ' + collabError.message);
         }
 
+        // Update request status
         const { error: updateError } = await supabase
           .from('collaboration_requests')
           .update({ 
@@ -128,19 +130,14 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
           .eq('id', request.id);
 
         if (updateError) {
-          
           throw new Error('Failed to update request status: ' + updateError.message);
         }
-
-        
 
         if (onAcceptRequest) {
           onAcceptRequest(request);
         }
-
-        
-        
       } else {
+        // Decline request
         const { error: updateError } = await supabase
           .from('collaboration_requests')
           .update({ 
@@ -150,24 +147,23 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
           .eq('id', request.id);
 
         if (updateError) {
-          
           throw updateError;
-        }  
+        }
       }
 
       setRequests(prev => prev.filter(r => r.id !== request.id));
       setExpandedId(null);
-    }finally {
+    } catch (error) {
+      console.error('Error handling request:', error);
+    } finally {
       setProcessing(null);
     }
   };
 
   const getSenderDisplayName = (request) => {
-    // Use sender_name from the request
     if (request.sender_name && request.sender_name.trim() !== '') {
       return request.sender_name;
     }
-    // Fall back to email
     return request.sender_email || 'Unknown';
   };
 
@@ -178,7 +174,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
 
   const isCustomMessage = (request) => {
     if (!request.message || request.message.trim() === '') return false;
-    // Check if it's the default auto-generated message
     const defaultPattern = /wants to collaborate on/i;
     return !defaultPattern.test(request.message);
   };
@@ -187,7 +182,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
 
   return (
     <div className="relative">
-      {/* Bell Button */}
       <button
         ref={buttonRef}
         onClick={() => setShowPanel(!showPanel)}
@@ -202,13 +196,11 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
         )}
       </button>
 
-      {/* Requests Panel */}
       {showPanel && (
         <div 
           ref={panelRef}
           className="absolute right-0 bottom-full mb-2 w-80 bg-white border border-gray-200 rounded-lg shadow-lg z-50 max-h-[28rem] overflow-hidden flex flex-col"
         >
-          {/* Header */}
           <div className="px-4 py-3 border-b border-gray-200">
             <h3 className="text-gray-900 font-semibold text-sm">Collaboration Requests</h3>
             {pendingCount > 0 && (
@@ -216,7 +208,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
             )}
           </div>
 
-          {/* Content */}
           <div className="flex-1 overflow-y-auto">
             {loading ? (
               <div className="p-6 text-center">
@@ -233,12 +224,11 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
               <div>
                 {requests.map((request) => (
                   <div key={request.id} className="border-b border-gray-100 last:border-b-0">
-                    {/* Request Item */}
                     <button
                       onClick={() => setExpandedId(expandedId === request.id ? null : request.id)}
                       className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
                     >
-                      {/* Avatar with Profile Picture Support */}
+                      {/* Avatar */}
                       <div className="relative w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden ring-2 ring-gray-200">
                         {request.sender_avatar_url ? (
                           <>
@@ -247,7 +237,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                               alt={getSenderDisplayName(request)}
                               className="w-full h-full object-cover"
                               onError={(e) => {
-                                // Fallback to gradient if image fails
                                 e.target.style.display = 'none';
                                 const fallback = e.target.nextElementSibling;
                                 if (fallback) {
@@ -255,7 +244,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                                 }
                               }}
                             />
-                            {/* Fallback gradient (hidden by default) */}
                             <div 
                               className="absolute inset-0 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center"
                               style={{ display: 'none' }}
@@ -270,7 +258,7 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                         )}
                       </div>
                       
-                      {/* Request Info */}
+                      {/* Request info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-gray-900 text-sm font-medium truncate">
                           {getSenderDisplayName(request)}
@@ -288,7 +276,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                         )}
                       </div>
 
-                      {/* Expand Icon */}
                       <ChevronRight 
                         className={`w-4 h-4 text-gray-400 transition-transform flex-shrink-0 ${
                           expandedId === request.id ? 'rotate-90' : ''
@@ -296,10 +283,9 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                       />
                     </button>
                     
-                    {/* Expanded Content */}
+                    {/* Expanded content */}
                     {expandedId === request.id && (
                       <div className="px-4 pb-3 pt-1 bg-gray-50">
-                        {/* Custom Message */}
                         {isCustomMessage(request) && (
                           <div className="mb-3">
                             <p className="text-xs text-gray-500 mb-1 font-medium">Message:</p>
@@ -309,14 +295,12 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                           </div>
                         )}
 
-                        {/* Sender Email */}
                         {request.sender_email && (
                           <p className="text-xs text-gray-500 mb-3">
                             From: {request.sender_email}
                           </p>
                         )}
 
-                        {/* Action Buttons */}
                         <div className="flex gap-2">
                           <button
                             onClick={() => handleRequest(request, 'accepted')}

@@ -226,14 +226,14 @@ export const CodeConverter = ({
             }
           }}
           disabled={disabled || isConverting || !currentCode.trim()}
-          className={`flex items-center gap-1 px-2 py-1 rounded-lg transition-all text-sm font-medium shadow-sm ${
+          className={`flex items-center gap-1 px-1 py-1.5 rounded-lg transition-all text-sm font-medium  justify-center ${
             isConverting
-              ? 'bg-orange-100 text-orange-700 cursor-wait border-2 border-orange-300'
+              ? 'bg-gray-900 text-white cursor-wait'
               : isOnCooldown
               ? 'bg-yellow-100 text-yellow-700 border-2 border-yellow-300 cursor-not-allowed'
               : !currentCode.trim()
               ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-              : 'bg-gradient-to-r from-purple-500 to-purple-600 text-white hover:from-purple-600 hover:to-purple-700 hover:shadow-md'
+              : 'bg-gray-900 text-white hover:bg-gray-800'
           } disabled:opacity-50`}
           title={
             isOnCooldown
@@ -245,9 +245,8 @@ export const CodeConverter = ({
         >
           {isConverting ? (
             <>
-              <RefreshCw className="w-4 h-4 animate-spin" />
-              <span className="hidden sm:inline">Converting...</span>
-              <span className="sm:hidden">...</span>
+              <Sparkles className="w-4 h-4 animate-pulse" />
+              
             </>
           ) : isOnCooldown ? (
             <>
@@ -257,8 +256,7 @@ export const CodeConverter = ({
           ) : (
             <>
               <Sparkles className="w-4 h-4" />
-              <span className="hidden sm:inline">Convert</span>
-              <span className="sm:hidden">AI</span>
+              
             </>
           )}
         </button>

@@ -17,6 +17,7 @@ export default function SignUpPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const router = useRouter();
 
+  // Redirect if already logged in
   useEffect(() => {
     const checkUser = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -33,6 +34,7 @@ export default function SignUpPage() {
     setError('');
     setMessage('');
 
+    // Validation
     if (!displayName.trim()) {
       setError('Display name is required');
       setIsLoading(false);
@@ -58,12 +60,12 @@ export default function SignUpPage() {
       });
 
       if (error) {
-        console.error('Sign up error:', error);
         setError(error.message);
         setIsLoading(false);
         return;
       }
 
+      // Create user profile
       if (data.user) {
         const { error: profileError } = await supabase
           .from('users')
@@ -78,13 +80,12 @@ export default function SignUpPage() {
           ]);
 
         if (profileError) {
-          console.error('Profile creation error:', profileError);
+          // Profile creation failed but account exists
         }
       }
 
       setMessage('Success! Check your email for the confirmation link.');
     } catch (err) {
-      console.error('Unexpected error:', err);
       setError('An unexpected error occurred. Please try again.');
     } finally {
       setIsLoading(false);
@@ -143,7 +144,7 @@ export default function SignUpPage() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-blackmb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-black mb-2">
                 Password
               </label>
               <div className="relative">

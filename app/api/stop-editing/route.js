@@ -32,14 +32,14 @@ export async function POST(request) {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error stopping editing:', error);
+      
       return NextResponse.json(
         { error: 'Failed to stop editing', details: error.message },
         { status: 500 }
       );
     }
 
-    console.log('✅ Successfully stopped editing for user:', userId, 'code:', codeId);
+    
 
     return NextResponse.json({ 
       success: true,
@@ -47,7 +47,7 @@ export async function POST(request) {
     });
 
   } catch (error) {
-    console.error('Exception in stop-editing endpoint:', error);
+    
     return NextResponse.json(
       { error: 'Internal server error', details: error.message },
       { status: 500 }

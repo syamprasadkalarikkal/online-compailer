@@ -57,12 +57,8 @@ export async function POST(request) {
     
     if (!apiKey) {
       return NextResponse.json(
-        { 
-          error: { 
-            message: 'API key not configured. Get a FREE key from https://console.groq.com' 
-          } 
-        },
-        { status: 500 }
+        { error: { message: 'Service temporarily unavailable' } },
+        { status: 503 }
       );
     }
 
@@ -126,12 +122,7 @@ Be specific about line numbers and provide actionable fixes.`;
 
   } catch (error) {
     return NextResponse.json(
-      { 
-        error: { 
-          message: error.message || 'Server error',
-          suggestion: 'Get a FREE Groq API key: https://console.groq.com'
-        } 
-      },
+      { error: { message: 'Internal server error' } },
       { status: 500 }
     );
   }

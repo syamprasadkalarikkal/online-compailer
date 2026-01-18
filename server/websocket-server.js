@@ -1,4 +1,3 @@
-// server/websocket-server.js
 const WebSocket = require('ws');
 const http = require('http');
 
@@ -8,15 +7,22 @@ const wss = new WebSocket.Server({ server });
 // Store active collaboration sessions
 const collaborationRooms = new Map();
 
+/**
+ * Manages a collaboration room for real-time code editing
+ * Handles client connections, edit locking, and code synchronization
+ */
 class CollaborationRoom {
   constructor(codeId) {
     this.codeId = codeId;
     this.clients = new Map(); // userId -> { ws, userEmail, lastSeen }
     this.currentCode = '';
-    this.currentEditor = null;
+    this.currentEditor = null; // User ID of current editor
     this.editStartTime = null;
   }
 
+  /**
+   * Adds a new client to the room and notifies other collaborators
+   */
   addClient(userId, userEmail, ws) {
     this.clients.set(userId, { ws, userEmail, lastSeen: Date.now() });
     this.broadcastCollaborators();
@@ -28,11 +34,15 @@ class CollaborationRoom {
     }, userId);
   }
 
+  /**
+   * Removes a client and releases edit lock if they were editing
+   * Returns true if room is now empty
+   */
   removeClient(userId) {
     const client = this.clients.get(userId);
     this.clients.delete(userId);
     
-    // If the user who left was editing, release the lock
+    // Release edit lock if this user was editing
     if (this.currentEditor === userId) {
       this.releaseEdit(userId);
     }
@@ -47,13 +57,14 @@ class CollaborationRoom {
     }
 
     this.broadcastCollaborators();
-
-    // Clean up room if empty
     return this.clients.size === 0;
   }
 
+  /**
+   * Grants editing permission to a user
+   * Returns false if another user is already editing
+   */
   requestEdit(userId, userEmail) {
-    // Check if someone else is editing
     if (this.currentEditor && this.currentEditor !== userId) {
       return false;
     }
@@ -71,6 +82,9 @@ class CollaborationRoom {
     return true;
   }
 
+  /**
+   * Releases editing lock for a user
+   */
   releaseEdit(userId) {
     if (this.currentEditor !== userId) return;
 
@@ -84,6 +98,10 @@ class CollaborationRoom {
     });
   }
 
+  /**
+   * Updates code and broadcasts changes to other clients
+   * Only allows updates from the current editor
+   */
   updateCode(userId, code) {
     if (this.currentEditor !== userId) return false;
 
@@ -93,11 +111,14 @@ class CollaborationRoom {
       userId,
       code,
       timestamp: new Date().toISOString()
-    }, userId); // Don't send back to sender
+    }, userId); // Exclude sender from broadcast
 
     return true;
   }
 
+  /**
+   * Sends current list of collaborators to all clients
+   */
   broadcastCollaborators() {
     const collaborators = Array.from(this.clients.entries()).map(([userId, client]) => ({
       userId,
@@ -112,6 +133,9 @@ class CollaborationRoom {
     });
   }
 
+  /**
+   * Broadcasts a message to all clients except the excluded one
+   */
   broadcast(message, excludeUserId = null) {
     const messageStr = JSON.stringify(message);
     
@@ -122,6 +146,9 @@ class CollaborationRoom {
     });
   }
 
+  /**
+   * Updates the last seen timestamp for a user
+   */
   updateLastSeen(userId) {
     const client = this.clients.get(userId);
     if (client) {
@@ -130,13 +157,12 @@ class CollaborationRoom {
   }
 }
 
-// Handle WebSocket connections
+// WebSocket connection handler
 wss.on('connection', (ws) => {
-  console.log('New WebSocket connection');
-  
   let userId = null;
   let currentCodeId = null;
 
+  // Handle incoming messages from client
   ws.on('message', (data) => {
     try {
       const message = JSON.parse(data.toString());
@@ -171,13 +197,14 @@ wss.on('connection', (ws) => {
           break;
 
         default:
-          console.log('Unknown message type:', message.type);
+          break;
       }
     } catch (error) {
-      console.error('Error processing message:', error);
+      // Invalid messages are silently ignored
     }
   });
 
+  // Handle client disconnect
   ws.on('close', () => {
     if (currentCodeId && userId) {
       const room = collaborationRooms.get(currentCodeId);
@@ -185,33 +212,33 @@ wss.on('connection', (ws) => {
         const isEmpty = room.removeClient(userId);
         if (isEmpty) {
           collaborationRooms.delete(currentCodeId);
-          console.log(`Room ${currentCodeId} closed`);
         }
       }
     }
-    console.log('WebSocket connection closed');
   });
 
-  ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
+  ws.on('error', () => {
+    // Errors are silently handled
   });
 
+  /**
+   * Handles user joining a collaboration room
+   */
   function handleJoin(ws, message) {
     userId = message.userId;
     currentCodeId = message.codeId;
     const userEmail = message.userEmail;
 
-    // Get or create room
+    // Get existing room or create new one
     let room = collaborationRooms.get(currentCodeId);
     if (!room) {
       room = new CollaborationRoom(currentCodeId);
       collaborationRooms.set(currentCodeId, room);
-      console.log(`Created new room for code: ${currentCodeId}`);
     }
 
     room.addClient(userId, userEmail, ws);
     
-    // Send current code state if available
+    // Send current code state to new user
     if (room.currentCode) {
       ws.send(JSON.stringify({
         type: 'code_update',
@@ -219,23 +246,27 @@ wss.on('connection', (ws) => {
         userId: null // System message
       }));
     }
-
-    console.log(`User ${userEmail} joined room ${currentCodeId}`);
   }
 
+  /**
+   * Handles request to start editing
+   */
   function handleStartEdit(message) {
     const room = collaborationRooms.get(message.codeId);
     if (!room) return;
 
     const success = room.requestEdit(message.userId, message.userEmail);
     
-    // Send confirmation back to requester
+    // Send grant/deny response to requester
     ws.send(JSON.stringify({
       type: success ? 'edit_granted' : 'edit_denied',
       currentEditor: room.currentEditor
     }));
   }
 
+  /**
+   * Handles request to stop editing
+   */
   function handleStopEdit(message) {
     const room = collaborationRooms.get(message.codeId);
     if (!room) return;
@@ -243,6 +274,9 @@ wss.on('connection', (ws) => {
     room.releaseEdit(message.userId);
   }
 
+  /**
+   * Handles code updates from the current editor
+   */
   function handleCodeUpdate(message) {
     const room = collaborationRooms.get(message.codeId);
     if (!room) return;
@@ -250,6 +284,9 @@ wss.on('connection', (ws) => {
     room.updateCode(message.userId, message.code);
   }
 
+  /**
+   * Handles cursor position updates for collaborative awareness
+   */
   function handleCursorPosition(message) {
     const room = collaborationRooms.get(message.codeId);
     if (!room) return;
@@ -270,31 +307,28 @@ setInterval(() => {
   collaborationRooms.forEach((room, codeId) => {
     room.clients.forEach((client, userId) => {
       if (now - client.lastSeen > INACTIVE_TIMEOUT) {
-        console.log(`Removing inactive user ${userId} from room ${codeId}`);
         client.ws.close();
         room.removeClient(userId);
       }
     });
 
+    // Delete empty rooms
     if (room.clients.size === 0) {
       collaborationRooms.delete(codeId);
     }
   });
 }, 5 * 60 * 1000);
 
+// Start WebSocket server
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => {
-  console.log(`WebSocket server running on port ${PORT}`);
-});
+server.listen(PORT);
 
-// Graceful shutdown
+// Graceful shutdown handler
 process.on('SIGTERM', () => {
-  console.log('SIGTERM received, closing server...');
   wss.clients.forEach(client => {
     client.close();
   });
   server.close(() => {
-    console.log('Server closed');
     process.exit(0);
   });
 });

@@ -130,12 +130,12 @@ async function callGroqWithRetry(prompt, apiKey, maxRetries = 3) {
     }
   }
   
-  throw lastError || new Error('All models failed. Please check your API key.');
+  throw lastError || new Error('Service temporarily unavailable');
 }
 
 export async function POST(request) {
   try {
-    const { code, fromLanguage, toLanguage, maxTokens } = await request.json();
+    const { code, fromLanguage, toLanguage } = await request.json();
 
     if (!code || !fromLanguage || !toLanguage) {
       return NextResponse.json(
@@ -162,7 +162,7 @@ export async function POST(request) {
       return NextResponse.json(
         { 
           error: { 
-            message: `Please wait ${rateLimitCheck.waitTime} seconds`,
+            message: `Rate limit exceeded. Please wait ${rateLimitCheck.waitTime} seconds`,
             waitTime: rateLimitCheck.waitTime
           } 
         },
@@ -174,12 +174,8 @@ export async function POST(request) {
     
     if (!apiKey) {
       return NextResponse.json(
-        { 
-          error: { 
-            message: 'API key not configured. Get a FREE key from https://console.groq.com and add GROQ_API_KEY to .env.local (500 requests/day free!)' 
-          } 
-        },
-        { status: 500 }
+        { error: { message: 'Service temporarily unavailable' } },
+        { status: 503 }
       );
     }
     
@@ -209,10 +205,10 @@ Output (${languageNames[toLanguage]}):`;
       let waitTime = 30;
       
       if (response.status === 429) {
-        message = 'Rate limit exceeded. Groq free tier: 500 requests/day. Please wait.';
+        message = 'Rate limit exceeded. Please try again later.';
         waitTime = 20;
       } else if (response.status === 401) {
-        message = 'Invalid API key. Get a free key from https://console.groq.com';
+        message = 'Service authentication failed';
         waitTime = 0;
       }
       
@@ -230,7 +226,7 @@ Output (${languageNames[toLanguage]}):`;
       convertedCode = data.choices[0].message?.content || '';
     } else {
       return NextResponse.json(
-        { error: { message: 'Invalid response from AI' } },
+        { error: { message: 'Invalid response from service' } },
         { status: 500 }
       );
     }
@@ -278,7 +274,7 @@ Output (${languageNames[toLanguage]}):`;
 
     if (!convertedCode) {
       return NextResponse.json(
-        { error: { message: 'Conversion resulted in empty code. Try simplifying your input.' } },
+        { error: { message: 'Conversion resulted in empty code' } },
         { status: 500 }
       );
     }
@@ -297,12 +293,7 @@ Output (${languageNames[toLanguage]}):`;
 
   } catch (error) {
     return NextResponse.json(
-      { 
-        error: { 
-          message: error.message || 'Server error. Please check your API key.',
-          suggestion: 'Get a FREE Groq API key (500 requests/day): https://console.groq.com'
-        } 
-      },
+      { error: { message: 'Internal server error' } },
       { status: 500 }
     );
   }

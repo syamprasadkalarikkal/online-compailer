@@ -1,6 +1,9 @@
-// hooks/useCollaboration.js - Enhanced with unsaved changes tracking
 import { useState, useEffect, useCallback, useRef } from 'react';
 
+/**
+ * Custom hook for managing real-time code collaboration
+ * Handles multi-user editing with locking, versioning, and sync
+ */
 export const useCollaboration = (codeId, user, supabase) => {
   const [collaborators, setCollaborators] = useState([]);
   const [activeEditors, setActiveEditors] = useState([]);
@@ -17,32 +20,20 @@ export const useCollaboration = (codeId, user, supabase) => {
   const lastSyncedCode = useRef(null);
   const isWindowClosing = useRef(false);
 
-  // Load collaborators for the current code
+  /**
+   * Loads all collaborators for the current code document
+   * Updates lock status based on active editors
+   */
   const loadCollaborators = useCallback(async () => {
-    if (!codeId || !supabase || !user) {
-      console.log('Skipping loadCollaborators: missing requirements', { 
-        codeId: !!codeId, 
-        supabase: !!supabase, 
-        user: !!user 
-      });
-      return;
-    }
+    if (!codeId || !supabase || !user) return;
 
     try {
-      console.log('📥 Loading collaborators for code:', codeId);
-
       const { data: collaboratorData, error: collabError } = await supabase
         .from('collaborators')
         .select('*')
         .eq('code_id', codeId);
 
       if (collabError) {
-        console.error('Error loading collaborators:', {
-          message: collabError.message,
-          details: collabError.details,
-          hint: collabError.hint,
-          code: collabError.code
-        });
         setCollaborators([]);
         setActiveEditors([]);
         setIsLocked(false);
@@ -50,16 +41,12 @@ export const useCollaboration = (codeId, user, supabase) => {
       }
 
       if (!collaboratorData || collaboratorData.length === 0) {
-        console.log('No collaborators found for code:', codeId);
         setCollaborators([]);
         setActiveEditors([]);
         setIsLocked(false);
         return;
       }
 
-      console.log('✅ Found collaborators:', collaboratorData.length);
-
-      // Format collaborators
       const formattedCollaborators = collaboratorData.map((c, index) => ({
         user_id: c.user_id,
         email: c.user_id === user.id ? user.email : `User ${index + 1}`,
@@ -71,67 +58,40 @@ export const useCollaboration = (codeId, user, supabase) => {
 
       setCollaborators(formattedCollaborators);
 
-      // Get list of active editors
       const editors = formattedCollaborators.filter(c => c.is_editing);
       setActiveEditors(editors);
 
-      // Check if code is locked (someone else is editing)
       const someoneElseEditing = editors.some(e => e.user_id !== user.id);
       setIsLocked(someoneElseEditing);
 
-      console.log('✅ Collaborators loaded:', formattedCollaborators.length);
-      console.log('✅ Active editors:', editors.length);
-      console.log('🔒 Code locked:', someoneElseEditing);
-
     } catch (error) {
-      console.error('Exception in loadCollaborators:', error);
       setCollaborators([]);
       setActiveEditors([]);
       setIsLocked(false);
     }
   }, [codeId, supabase, user]);
 
-  // Start editing - WITH LOCK CHECK
+  /**
+   * Attempts to acquire editing lock
+   * Returns false if another user is currently editing
+   */
   const startEditing = useCallback(async () => {
-    if (!codeId || !supabase || !user) {
-      console.error('Missing required params for startEditing', {
-        codeId: !!codeId,
-        supabase: !!supabase,
-        user: !!user
-      });
-      return false;
-    }
+    if (!codeId || !supabase || !user) return false;
 
     try {
-      console.log('🔓 Attempting to start editing for user:', user.id);
-
-      // CRITICAL: Check if anyone else is currently editing
       const { data: existingEditors, error: checkError } = await supabase
         .from('collaborators')
         .select('user_id, is_editing')
         .eq('code_id', codeId)
         .eq('is_editing', true);
 
-      if (checkError) {
-        console.error('Error checking for active editors:', {
-          message: checkError.message,
-          details: checkError.details,
-          hint: checkError.hint,
-          code: checkError.code
-        });
-        return false;
-      }
+      if (checkError) return false;
 
-      // If someone else is editing, deny access
       if (existingEditors && existingEditors.length > 0) {
         const otherUserEditing = existingEditors.some(e => e.user_id !== user.id);
-        if (otherUserEditing) {
-          console.log('❌ Code is locked by another user');
-          return false;
-        }
+        if (otherUserEditing) return false;
       }
 
-      // Proceed to mark as editing
       const { error: updateError } = await supabase
         .from('collaborators')
         .update({ 
@@ -141,17 +101,8 @@ export const useCollaboration = (codeId, user, supabase) => {
         .eq('code_id', codeId)
         .eq('user_id', user.id);
 
-      if (updateError) {
-        console.error('Error updating editing status:', {
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint,
-          code: updateError.code
-        });
-        return false;
-      }
+      if (updateError) return false;
 
-      console.log('✅ Successfully started editing');
       await loadLatestVersion();
       setHasUnsavedChanges(false);
       startHeartbeat();
@@ -159,27 +110,19 @@ export const useCollaboration = (codeId, user, supabase) => {
 
       return true;
     } catch (error) {
-      console.error('Exception starting edit:', error);
       return false;
     }
   }, [codeId, supabase, user]);
 
-  // Stop editing
+  /**
+   * Releases editing lock
+   * Prevents release if unsaved changes exist
+   */
   const stopEditing = useCallback(async () => {
-    if (!codeId || !supabase || !user) {
-      console.log('Cannot stop editing: missing requirements');
-      return;
-    }
-
-    // Don't allow stopping if there are unsaved changes
-    if (hasUnsavedChanges) {
-      console.log('Cannot stop editing: unsaved changes exist');
-      return false;
-    }
+    if (!codeId || !supabase || !user) return;
+    if (hasUnsavedChanges) return false;
 
     try {
-      console.log('🔒 Stopping editing for user:', user.id);
-
       const { error } = await supabase
         .from('collaborators')
         .update({ 
@@ -189,17 +132,7 @@ export const useCollaboration = (codeId, user, supabase) => {
         .eq('code_id', codeId)
         .eq('user_id', user.id);
 
-      if (error) {
-        console.error('Error stopping editing:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        return false;
-      } else {
-        console.log('✅ Successfully stopped editing');
-      }
+      if (error) return false;
 
       stopHeartbeat();
       setHasUnsavedChanges(false);
@@ -207,27 +140,18 @@ export const useCollaboration = (codeId, user, supabase) => {
       return true;
 
     } catch (error) {
-      console.error('Exception stopping edit:', error);
       return false;
     }
   }, [codeId, supabase, user, hasUnsavedChanges, loadCollaborators]);
 
-  // Remove collaborator (owner only)
+  /**
+   * Removes a collaborator from the code document
+   * Owner-only operation
+   */
   const removeCollaborator = useCallback(async (collaboratorUserId) => {
-    if (!codeId || !supabase || !user) {
-      console.error('Cannot remove collaborator: missing requirements');
-      return false;
-    }
-
-    if (!collaboratorUserId) {
-      console.error('Invalid collaboratorUserId');
-      return false;
-    }
+    if (!codeId || !supabase || !user || !collaboratorUserId) return false;
 
     try {
-      console.log('🗑️ Removing collaborator:', collaboratorUserId);
-
-      // Verify current user is owner
       const { data: ownerCheck, error: ownerError } = await supabase
         .from('collaborators')
         .select('is_owner')
@@ -235,28 +159,10 @@ export const useCollaboration = (codeId, user, supabase) => {
         .eq('user_id', user.id)
         .maybeSingle();
 
-      if (ownerError) {
-        console.error('Error checking ownership:', {
-          message: ownerError.message,
-          details: ownerError.details,
-          hint: ownerError.hint,
-          code: ownerError.code
-        });
-        return false;
-      }
+      if (ownerError) return false;
+      if (!ownerCheck?.is_owner) return false;
+      if (collaboratorUserId === user.id) return false;
 
-      if (!ownerCheck?.is_owner) {
-        console.error('❌ Only owner can remove collaborators');
-        return false;
-      }
-
-      // Can't remove yourself if you're the owner
-      if (collaboratorUserId === user.id) {
-        console.error('❌ Owner cannot remove themselves');
-        return false;
-      }
-
-      // Remove the collaborator
       const { error: deleteError } = await supabase
         .from('collaborators')
         .delete()
@@ -264,37 +170,24 @@ export const useCollaboration = (codeId, user, supabase) => {
         .eq('user_id', collaboratorUserId)
         .eq('is_owner', false);
 
-      if (deleteError) {
-        console.error('Error removing collaborator:', {
-          message: deleteError.message,
-          details: deleteError.details,
-          hint: deleteError.hint,
-          code: deleteError.code
-        });
-        return false;
-      }
+      if (deleteError) return false;
 
-      console.log('✅ Collaborator removed successfully');
       await loadCollaborators();
       return true;
 
     } catch (error) {
-      console.error('Exception removing collaborator:', error);
       return false;
     }
   }, [codeId, supabase, user, loadCollaborators]);
 
-  // Load latest code version
+  /**
+   * Fetches the latest version of the code
+   * Tries code_edits table first, falls back to saved_codes
+   */
   const loadLatestVersion = useCallback(async () => {
-    if (!codeId || !supabase) {
-      console.log('Skipping loadLatestVersion: missing codeId or supabase');
-      return;
-    }
+    if (!codeId || !supabase) return;
 
     try {
-      console.log('📥 Loading latest code version for:', codeId);
-
-      // Try to get the latest edit from code_edits table
       const { data: latestEdit, error: editError } = await supabase
         .from('code_edits')
         .select('version, content')
@@ -303,69 +196,36 @@ export const useCollaboration = (codeId, user, supabase) => {
         .limit(1)
         .maybeSingle();
 
-      if (editError) {
-        console.error('Error loading latest edit:', {
-          message: editError.message,
-          details: editError.details,
-          hint: editError.hint,
-          code: editError.code
-        });
-      }
-
       if (latestEdit) {
-        console.log('✅ Loaded latest version from code_edits:', latestEdit.version);
         setLastSyncedVersion(latestEdit.version);
         setRemoteCode(latestEdit.content);
         lastSyncedCode.current = latestEdit.content;
       } else {
-        // Fallback to saved_codes table
-        console.log('No edits found, loading from saved_codes');
-        
         const { data: codeData, error: codeError } = await supabase
           .from('saved_codes')
           .select('code')
           .eq('id', codeId)
           .maybeSingle();
 
-        if (codeError) {
-          console.error('Error loading code:', {
-            message: codeError.message,
-            details: codeError.details,
-            hint: codeError.hint,
-            code: codeError.code,
-            codeId: codeId
-          });
-          return;
-        }
+        if (codeError || !codeData) return;
 
-        if (!codeData) {
-          console.warn('Code not found with id:', codeId);
-          return;
-        }
-
-        console.log('✅ Loaded code from saved_codes');
         setRemoteCode(codeData.code);
         lastSyncedCode.current = codeData.code;
         setLastSyncedVersion(0);
       }
     } catch (error) {
-      console.error('Exception loading latest version:', error);
+      // Silent fail - maintains current state
     }
   }, [codeId, supabase]);
 
-  // Sync code changes
+  /**
+   * Syncs local code changes to the server
+   * Creates new version entry and updates saved code
+   */
   const syncCode = useCallback(async (code) => {
-    if (!codeId || !supabase || !user) {
-      console.log('Skipping syncCode: missing requirements');
-      return;
-    }
+    if (!codeId || !supabase || !user) return;
+    if (isApplyingRemoteChange.current || isSyncing.current) return;
 
-    if (isApplyingRemoteChange.current || isSyncing.current) {
-      console.log('Skipping syncCode: already syncing or applying remote change');
-      return;
-    }
-
-    // Track if changes are different from last synced version
     if (code !== lastSyncedCode.current) {
       setHasUnsavedChanges(true);
     }
@@ -373,8 +233,7 @@ export const useCollaboration = (codeId, user, supabase) => {
     isSyncing.current = true;
 
     try {
-      // Get the latest version
-      const { data: lastEdit, error: versionError } = await supabase
+      const { data: lastEdit } = await supabase
         .from('code_edits')
         .select('version')
         .eq('code_id', codeId)
@@ -382,14 +241,8 @@ export const useCollaboration = (codeId, user, supabase) => {
         .limit(1)
         .maybeSingle();
 
-      if (versionError) {
-        console.error('Error getting latest version:', versionError);
-      }
-
       const nextVersion = (lastEdit?.version || 0) + 1;
-      console.log('💾 Syncing code, version:', nextVersion);
 
-      // Insert new edit
       const { error: insertError } = await supabase
         .from('code_edits')
         .insert({
@@ -400,18 +253,9 @@ export const useCollaboration = (codeId, user, supabase) => {
           created_at: new Date().toISOString()
         });
 
-      if (insertError) {
-        console.error('Error inserting edit:', {
-          message: insertError.message,
-          details: insertError.details,
-          hint: insertError.hint,
-          code: insertError.code
-        });
-        throw insertError;
-      }
+      if (insertError) throw insertError;
 
-      // Update saved_codes table
-      const { error: updateError } = await supabase
+      await supabase
         .from('saved_codes')
         .update({ 
           code: code,
@@ -419,28 +263,20 @@ export const useCollaboration = (codeId, user, supabase) => {
         })
         .eq('id', codeId);
 
-      if (updateError) {
-        console.error('Error updating saved_codes:', {
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint,
-          code: updateError.code
-        });
-      }
-
       setLastSyncedVersion(nextVersion);
       lastSyncedCode.current = code;
       setHasUnsavedChanges(false);
-      console.log('✅ Successfully synced code, version:', nextVersion);
 
     } catch (error) {
-      console.error('Exception syncing code:', error);
+      // Retry logic could be added here
     } finally {
       isSyncing.current = false;
     }
   }, [codeId, supabase, user]);
 
-  // Heartbeat
+  /**
+   * Starts periodic heartbeat to maintain active status
+   */
   const startHeartbeat = useCallback(() => {
     stopHeartbeat();
 
@@ -454,35 +290,30 @@ export const useCollaboration = (codeId, user, supabase) => {
           .eq('code_id', codeId)
           .eq('user_id', user.id);
       } catch (error) {
-        console.error('Heartbeat error:', error);
+        // Silent fail - heartbeat will retry
       }
     }, 15000);
-
-    console.log('💓 Heartbeat started');
   }, [codeId, supabase, user]);
 
+  /**
+   * Stops heartbeat interval
+   */
   const stopHeartbeat = useCallback(() => {
     if (heartbeatInterval.current) {
       clearInterval(heartbeatInterval.current);
       heartbeatInterval.current = null;
-      console.log('💓 Heartbeat stopped');
     }
   }, []);
 
-  // Real-time subscriptions
+  /**
+   * Sets up real-time subscriptions for collaborators and code edits
+   */
   useEffect(() => {
-    if (!codeId || !supabase || !user) {
-      console.log('Skipping subscription setup: missing requirements');
-      return;
-    }
-
-    console.log('🔌 Setting up real-time subscriptions for code:', codeId);
+    if (!codeId || !supabase || !user) return;
     
-    // Initial load
     loadCollaborators();
     loadLatestVersion();
 
-    // Subscribe to collaborator changes
     collaboratorsChannel.current = supabase
       .channel(`collaborators:${codeId}`)
       .on('postgres_changes', {
@@ -490,15 +321,11 @@ export const useCollaboration = (codeId, user, supabase) => {
         schema: 'public',
         table: 'collaborators',
         filter: `code_id=eq.${codeId}`
-      }, (payload) => {
-        console.log('👥 Collaborator change:', payload.eventType);
+      }, () => {
         loadCollaborators();
       })
-      .subscribe((status) => {
-        console.log('📡 Collaborators channel status:', status);
-      });
+      .subscribe();
 
-    // Subscribe to code edits
     editsChannel.current = supabase
       .channel(`edits:${codeId}`)
       .on('postgres_changes', {
@@ -507,10 +334,7 @@ export const useCollaboration = (codeId, user, supabase) => {
         table: 'code_edits',
         filter: `code_id=eq.${codeId}`
       }, (payload) => {
-        console.log('✏️ Code edit from:', payload.new.user_id);
-        
         if (payload.new.user_id !== user.id) {
-          console.log('📝 Applying remote change');
           isApplyingRemoteChange.current = true;
           setRemoteCode(payload.new.content);
           lastSyncedCode.current = payload.new.content;
@@ -521,14 +345,9 @@ export const useCollaboration = (codeId, user, supabase) => {
           }, 100);
         }
       })
-      .subscribe((status) => {
-        console.log('📡 Edits channel status:', status);
-      });
+      .subscribe();
 
-    // Cleanup on unmount
     return () => {
-      console.log('🧹 Cleaning up subscriptions and heartbeat');
-      
       if (collaboratorsChannel.current) {
         supabase.removeChannel(collaboratorsChannel.current);
         collaboratorsChannel.current = null;
@@ -541,7 +360,6 @@ export const useCollaboration = (codeId, user, supabase) => {
       
       stopHeartbeat();
       
-      // Mark as not editing on cleanup ONLY if window is actually closing
       if (supabase && user && codeId && isWindowClosing.current) {
         supabase
           .from('collaborators')
@@ -551,28 +369,26 @@ export const useCollaboration = (codeId, user, supabase) => {
           })
           .eq('code_id', codeId)
           .eq('user_id', user.id)
-          .then(() => console.log('✅ Cleanup: stopped editing'))
-          .catch(err => console.error('❌ Cleanup error:', err));
+          .catch(() => {});
       }
     };
   }, [codeId, supabase, user, loadCollaborators, loadLatestVersion, stopHeartbeat]);
 
-  // Page unload handler - ONLY for window close, NOT refresh
+  /**
+   * Handles browser close/refresh events
+   * Warns on unsaved changes, releases lock on close
+   */
   useEffect(() => {
     const handleBeforeUnload = (e) => {
       if (supabase && user && codeId) {
-        // Check if this is a real close (not refresh)
-        // Set flag for cleanup
         isWindowClosing.current = true;
         
-        // Use sendBeacon for reliable cleanup on page close
         if (navigator.sendBeacon) {
           const url = `${window.location.origin}/api/stop-editing`;
           const data = JSON.stringify({ codeId, userId: user.id });
           navigator.sendBeacon(url, data);
         }
         
-        // Warn if there are unsaved changes
         if (hasUnsavedChanges) {
           e.preventDefault();
           e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
@@ -581,10 +397,8 @@ export const useCollaboration = (codeId, user, supabase) => {
       }
     };
 
-    // Detect if it's a refresh vs close
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        // Page is being hidden, but not necessarily closed
         isWindowClosing.current = false;
       }
     };
@@ -598,7 +412,6 @@ export const useCollaboration = (codeId, user, supabase) => {
     };
   }, [codeId, user, supabase, hasUnsavedChanges]);
 
-  // Calculate derived states
   const isCollaborator = collaborators.some(c => c.user_id === user?.id);
   const isOwner = collaborators.find(c => c.user_id === user?.id)?.is_owner || false;
   const currentUserEditing = activeEditors.some(e => e.user_id === user?.id);

@@ -547,12 +547,6 @@ const AICopilot = ({ code, lang, onFixApplied, isEnabled = true }) => {
               ))}
             </div>
 
-            <div className="px-5 py-3 border-t border-gray-200 bg-gradient-to-r from-gray-50 to-indigo-50">
-              <div className="flex items-center gap-2 text-xs text-gray-600">
-                <Sparkles className="w-4 h-4 text-indigo-600" />
-                <span>AI-powered analysis using Groq's Llama 3.3 70B</span>
-              </div>
-            </div>
           </div>
         </>
       )}

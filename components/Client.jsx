@@ -38,14 +38,14 @@ const defaultCode = {
 
 const loadEditorState = () => {
   if (typeof window === 'undefined') return null;
-  
+
   try {
     const savedState = localStorage.getItem('editorState');
     if (!savedState) return null;
-    
+
     const state = JSON.parse(savedState);
     const isRecent = Date.now() - state.timestamp < 24 * 60 * 60 * 1000;
-    
+
     return isRecent ? state : null;
   } catch (error) {
     return null;
@@ -55,7 +55,7 @@ const loadEditorState = () => {
 export default function Client() {
   const router = useRouter();
   const initialState = loadEditorState();
-  
+
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [lang, setLang] = useState(initialState?.lang || 'javascript');
@@ -65,9 +65,9 @@ export default function Client() {
   const [execTime, setExecTime] = useState(initialState?.execTime || 0);
   const [isCopied, setIsCopied] = useState(false);
   const [programInputs, setProgramInputs] = useState(initialState?.programInputs || '');
-  
+
   const abortControllerRef = useRef(null);
-  
+
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [currentCodeId, setCurrentCodeId] = useState(initialState?.currentCodeId || null);
   const [codeTitle, setCodeTitle] = useState(initialState?.codeTitle || '');
@@ -76,7 +76,7 @@ export default function Client() {
   const [showSaveMessage, setShowSaveMessage] = useState(false);
   const [isEditingSavedCode, setIsEditingSavedCode] = useState(initialState?.isEditingSavedCode || false);
   const [isSharedCode, setIsSharedCode] = useState(initialState?.isSharedCode || false);
-  
+
   const [savedCodes, setSavedCodes] = useState([]);
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [editingCodeName, setEditingCodeName] = useState(null);
@@ -95,7 +95,8 @@ export default function Client() {
     stopEditing,
     removeCollaborator,
     syncCode,
-    remoteCode
+    remoteCode,
+    totalCollaborators
   } = useCollaboration(currentCodeId, user, supabase);
 
   const updateTimerRef = useRef(null);
@@ -147,7 +148,7 @@ export default function Client() {
       async (event, session) => {
         setUser(session?.user ?? null);
         setLoading(false);
-        
+
         if (session?.user) {
           loadUserCodes(session.user);
         } else {
@@ -194,7 +195,7 @@ export default function Client() {
     if (!currentUser || !supabase) {
       return;
     }
-    
+
     try {
       const { data: collaboratorRecords, error: collabError } = await supabase
         .from('collaborators')
@@ -214,7 +215,7 @@ export default function Client() {
         `)
         .eq('user_id', currentUser.id)
         .order('saved_codes(updated_at)', { ascending: false });
-      
+
       if (collabError) {
         setSavedCodes([]);
         return;
@@ -224,7 +225,7 @@ export default function Client() {
         .map(record => {
           const code = record.saved_codes;
           if (!code) return null;
-          
+
           return {
             ...code,
             is_owned: record.is_owner,
@@ -237,12 +238,12 @@ export default function Client() {
         new Map(allCodes.map(code => [code.id, code])).values()
       );
 
-      uniqueCodes.sort((a, b) => 
+      uniqueCodes.sort((a, b) =>
         new Date(b.updated_at) - new Date(a.updated_at)
       );
 
       setSavedCodes(uniqueCodes);
-      
+
     } catch (error) {
       setSavedCodes([]);
     }
@@ -257,13 +258,13 @@ export default function Client() {
     if (currentUserEditing) {
       await stopEditing();
     }
-    
+
     try {
       localStorage.removeItem('editorState');
     } catch (error) {
       // Silent fail
     }
-    
+
     setCurrentCodeId(null);
     setCodeTitle('');
     setCode(defaultCode[lang] || '');
@@ -313,10 +314,10 @@ export default function Client() {
     setIsRunning(true);
     setOutput('');
     setExecTime(0);
-    
+
     const startTime = Date.now();
     abortControllerRef.current = new AbortController();
-    
+
     try {
       const response = await fetch('/api/execute', {
         method: 'POST',
@@ -342,7 +343,7 @@ export default function Client() {
         setExecTime(Date.now() - startTime);
         setIsRunning(false);
       }
-      
+
     } catch (error) {
       if (error.name === 'AbortError') {
         setOutput('Execution cancelled');
@@ -383,11 +384,11 @@ export default function Client() {
       setTimeout(() => setShowSaveMessage(false), 3000);
       return;
     }
-    
+
     setIsSaving(true);
     setSaveMessage('');
     setShowSaveMessage(false);
-    
+
     try {
       const { data: { session }, error: authError } = await supabase.auth.getSession();
       if (authError || !session) {
@@ -410,29 +411,29 @@ export default function Client() {
           .eq('id', currentCodeId)
           .select()
           .single();
-        
+
         if (error) {
           throw new Error(`Failed to update code: ${error.message}`);
         }
-        
-        setSavedCodes(prev => prev.map(c => 
-          c.id === currentCodeId 
-            ? { ...data, is_owned: c.is_owned, is_shared: c.is_shared } 
+
+        setSavedCodes(prev => prev.map(c =>
+          c.id === currentCodeId
+            ? { ...data, is_owned: c.is_owned, is_shared: c.is_shared }
             : c
         ));
         setSaveMessage('Code updated successfully!');
-        
+
       } else {
         const { data, error } = await supabase
           .from('saved_codes')
           .insert([codeData])
           .select()
           .single();
-        
+
         if (error) {
           throw new Error(`Failed to save code: ${error.message}`);
         }
-        
+
         const { error: collabError } = await supabase
           .from('collaborators')
           .insert([{
@@ -446,21 +447,21 @@ export default function Client() {
         if (collabError) {
           // Silent fail for collaborator insert
         }
-        
+
         setSavedCodes(prev => [{ ...data, is_owned: true, is_shared: false }, ...prev]);
         setCurrentCodeId(data.id);
         setSaveMessage('Code saved successfully!');
         setIsSharedCode(false);
       }
-      
+
       setIsEditingSavedCode(true);
-      
+
       setShowSaveMessage(true);
       setTimeout(() => {
         setShowSaveMessage(false);
         setShowSaveDialog(false);
       }, 2000);
-      
+
     } catch (error) {
       setSaveMessage(error.message || 'Failed to save code');
       setShowSaveMessage(true);
@@ -478,7 +479,7 @@ export default function Client() {
     if (currentUserEditing) {
       await stopEditing();
     }
-    
+
     setCurrentCodeId(savedCode.id);
     setCodeTitle(savedCode.title || 'Untitled');
     setCode(savedCode.code || '');
@@ -489,7 +490,7 @@ export default function Client() {
     setIsEditingSavedCode(true);
     setIsSharedCode(savedCode.is_shared || false);
     stateRestoredRef.current = false;
-    
+
     try {
       const editorState = {
         currentCodeId: savedCode.id,
@@ -517,28 +518,28 @@ export default function Client() {
     try {
       const { data, error } = await supabase
         .from('saved_codes')
-        .update({ 
-          title: newName.trim(), 
-          updated_at: new Date().toISOString() 
+        .update({
+          title: newName.trim(),
+          updated_at: new Date().toISOString()
         })
         .eq('id', codeId)
         .select()
         .single();
-      
+
       if (error) {
         throw error;
       }
-      
-      setSavedCodes(prev => prev.map(c => 
-        c.id === codeId 
-          ? { ...data, is_owned: c.is_owned, is_shared: c.is_shared } 
+
+      setSavedCodes(prev => prev.map(c =>
+        c.id === codeId
+          ? { ...data, is_owned: c.is_owned, is_shared: c.is_shared }
           : c
       ));
-      
+
       if (codeId === currentCodeId) {
         setCodeTitle(newName.trim());
       }
-      
+
       setEditingCodeName(null);
     } catch (error) {
       alert('Failed to rename code. Please try again.');
@@ -556,13 +557,13 @@ export default function Client() {
         .delete()
         .eq('id', codeId)
         .eq('user_id', user.id);
-      
+
       if (error) {
         throw error;
       }
-      
+
       setSavedCodes(prev => prev.filter(c => c.id !== codeId));
-      
+
       if (currentCodeId === codeId) {
         createNewCode();
       }
@@ -580,10 +581,10 @@ export default function Client() {
       if (currentUserEditing) {
         await stopEditing();
       }
-      
+
       localStorage.removeItem('editorState');
       await supabase.auth.signOut();
-      
+
       setLang('javascript');
       setCode(defaultCode['javascript']);
       setOutput('');
@@ -616,12 +617,12 @@ export default function Client() {
       alert('Database not available');
       return;
     }
-    
+
     if (!request || !request.code_id) {
       alert('Invalid collaboration request');
       return;
     }
-    
+
     try {
       const { data: codeData, error } = await supabase
         .from('saved_codes')
@@ -642,7 +643,7 @@ export default function Client() {
       if (currentUserEditing) {
         await stopEditing();
       }
-      
+
       setCurrentCodeId(codeData.id);
       setCodeTitle(codeData.title || 'Untitled');
       setCode(codeData.code || '');
@@ -652,7 +653,7 @@ export default function Client() {
       setIsEditingSavedCode(true);
       setIsSharedCode(true);
       stateRestoredRef.current = false;
-      
+
       await loadUserCodes();
       alert(`Now collaborating on "${codeData.title}"!`);
     } catch (error) {
@@ -680,9 +681,9 @@ export default function Client() {
       alert('Cannot change language while editing a saved code. Click "New" to start fresh.');
       return;
     }
-    
+
     setLang(newLang);
-    
+
     if (!skipCodeReset) {
       setCode(defaultCode[newLang] || '');
       setOutput('');
@@ -695,7 +696,7 @@ export default function Client() {
       alert('Someone else is currently editing. Please wait for them to finish.');
       return;
     }
-    
+
     const success = await startEditing();
     if (!success) {
       alert('Unable to start editing. Another user may have just started editing.');
@@ -703,10 +704,11 @@ export default function Client() {
   };
 
   const handleStopEditing = async () => {
-    if (hasUnsavedChanges) {
-      alert('Please wait for your changes to be saved before stopping editing.');
-      return;
+    // Flush any pending updates immediately
+    if (updateTimerRef.current) {
+      clearTimeout(updateTimerRef.current);
     }
+    await syncCode(code);
     await stopEditing();
   };
 
@@ -714,7 +716,7 @@ export default function Client() {
     if (!userId) {
       return false;
     }
-    
+
     const success = await removeCollaborator(userId);
     if (success) {
       await loadUserCodes();
@@ -722,7 +724,7 @@ export default function Client() {
     return success;
   };
 
-  const shouldShowCollaboration = isSharedCode || (collaborators.length > 1 && currentCodeId);
+  const shouldShowCollaboration = isSharedCode || (totalCollaborators.length > 1 && currentCodeId);
 
   if (loading) {
     return (
@@ -798,6 +800,8 @@ export default function Client() {
             isSaving={isSaving}
             saveMessage={saveMessage}
             showSaveMessage={showSaveMessage}
+            supabase={supabase}
+            collaborators={collaborators}
           />
           <OutputPanel
             output={output}
@@ -829,8 +833,8 @@ export default function Client() {
         supabase={supabase}
         onUserUpdate={handleUserUpdate}
         onAcceptCollaboration={handleAcceptCollaboration}
-        currentCodeId={currentCodeId}  
-        codeTitle={codeTitle}          
+        currentCodeId={currentCodeId}
+        codeTitle={codeTitle}
       />
     </div>
   );

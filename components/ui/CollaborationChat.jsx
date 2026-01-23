@@ -12,6 +12,7 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
   const [userProfiles, setUserProfiles] = useState({});
   const messagesEndRef = useRef(null);
   const chatRef = useRef(null);
+  const wsRef = useRef(null);
 
   // Load user profiles for avatar display
   useEffect(() => {
@@ -42,34 +43,63 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
     loadProfiles();
   }, [collaborators, supabase]);
 
-  // Load messages and subscribe to new ones
+  // WebSocket logic
   useEffect(() => {
-    if (!currentCodeId || !supabase || !user) return;
+    if (!currentCodeId || !user) return;
 
-    loadMessages();
+    // Connect to WebSocket server
+    const ws = new WebSocket('ws://localhost:8081'); // Use env var in production
+    wsRef.current = ws;
 
-    // Subscribe to new messages
-    const channel = supabase
-      .channel(`chat_${currentCodeId}`)
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'chat_messages',
-        filter: `code_id=eq.${currentCodeId}`
-      }, (payload) => {
-        setMessages(prev => [...prev, payload.new]);
-        
-        // Increment unread if chat is closed or minimized and message is not from current user
-        if ((!showChat || isMinimized) && payload.new.user_id !== user.id) {
-          setUnreadCount(prev => prev + 1);
+    ws.onopen = () => {
+      // Join the room
+      ws.send(JSON.stringify({
+        type: 'join',
+        userId: user.id,
+        codeId: currentCodeId,
+        userEmail: user.email
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data.type === 'chat_message') {
+          // Add message to state - check if it already exists to avoid duplicates
+          setMessages(prev => {
+            // Check if message already exists (by timestamp and user_id)
+            const exists = prev.some(msg =>
+              msg.created_at === data.created_at &&
+              msg.user_id === data.user_id &&
+              msg.message === data.message
+            );
+
+            if (exists) return prev;
+            return [...prev, data];
+          });
+
+          // Increment unread if chat is closed or minimized and message is not from current user
+          if ((!showChat || isMinimized) && data.user_id !== user.id) {
+            setUnreadCount(prev => prev + 1);
+          }
         }
-      })
-      .subscribe();
+      } catch (error) {
+        console.error('Error parsing WebSocket message:', error);
+      }
+    };
 
     return () => {
-      supabase.removeChannel(channel);
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
     };
-  }, [currentCodeId, supabase, user, showChat, isMinimized]);
+  }, [currentCodeId, user, showChat, isMinimized]);
+
+  // Load initial messages from Supabase (history)
+  useEffect(() => {
+    if (!currentCodeId || !supabase) return;
+    loadMessages();
+  }, [currentCodeId, supabase]);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -84,6 +114,37 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
       setUnreadCount(0);
     }
   }, [showChat, isMinimized]);
+
+  // Close chat and reset when currentCodeId becomes null (New button clicked)
+  useEffect(() => {
+    if (!currentCodeId) {
+      setShowChat(false);
+      setMessages([]);
+      setUnreadCount(0);
+      setIsMinimized(false);
+    }
+  }, [currentCodeId]);
+
+  // Click outside to close chat
+  useEffect(() => {
+    if (!showChat) return;
+
+    const handleClickOutside = (event) => {
+      if (chatRef.current && !chatRef.current.contains(event.target)) {
+        setShowChat(false);
+      }
+    };
+
+    // Add a small delay to prevent immediate closing when opening
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showChat]);
 
   const loadMessages = async () => {
     if (!currentCodeId || !supabase) return;
@@ -107,24 +168,49 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
     if (!newMessage.trim() || !currentCodeId || !user || !supabase || sending) return;
 
     setSending(true);
+    const timestamp = new Date().toISOString();
+    const messageText = newMessage.trim();
+
     try {
       const messageData = {
         code_id: currentCodeId,
         user_id: user.id,
-        message: newMessage.trim(),
-        created_at: new Date().toISOString()
+        message: messageText,
+        created_at: timestamp
       };
 
+      // Optimistically add message to local state immediately
+      setMessages(prev => [...prev, messageData]);
+      setNewMessage('');
+
+      // Send via WebSocket for real-time updates to other users
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({
+          type: 'chat_message',
+          codeId: currentCodeId,
+          userId: user.id,
+          user_id: user.id,
+          message: messageText,
+          created_at: timestamp,
+          timestamp: timestamp
+        }));
+      }
+
+      // Persist to Supabase
       const { error } = await supabase
         .from('chat_messages')
         .insert([messageData]);
 
-      if (error) throw error;
+      if (error) {
+        // Remove the optimistic message on error
+        setMessages(prev => prev.filter(msg => msg.created_at !== timestamp));
+        throw error;
+      }
 
-      setNewMessage('');
     } catch (error) {
       console.error('Error sending message:', error);
       alert('Failed to send message. Please try again.');
+      setNewMessage(messageText); // Restore the message
     } finally {
       setSending(false);
     }
@@ -156,13 +242,13 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
     const now = new Date();
     const diffMs = now - date;
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 1) return 'Just now';
     if (diffMins < 60) return `${diffMins}m ago`;
-    
+
     const diffHours = Math.floor(diffMins / 60);
     if (diffHours < 24) return `${diffHours}h ago`;
-    
+
     return date.toLocaleDateString();
   };
 
@@ -262,11 +348,10 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
                               />
                             ) : null}
                             <div
-                              className={`w-full h-full ${profile.avatar_url ? 'hidden' : 'flex'} items-center justify-center text-xs font-bold ${
-                                isOwnMessage
-                                  ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
-                                  : 'bg-gradient-to-br from-indigo-400 to-purple-600'
-                              } text-white`}
+                              className={`w-full h-full ${profile.avatar_url ? 'hidden' : 'flex'} items-center justify-center text-xs font-bold ${isOwnMessage
+                                ? 'bg-gradient-to-br from-emerald-400 to-emerald-600'
+                                : 'bg-gradient-to-br from-indigo-400 to-purple-600'
+                                } text-white`}
                             >
                               {getInitials(msg.user_id)}
                             </div>
@@ -283,11 +368,10 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
                             </span>
                           )}
                           <div
-                            className={`px-3 py-2 rounded-lg ${
-                              isOwnMessage
-                                ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white'
-                                : 'bg-white text-gray-900 border border-gray-200'
-                            }`}
+                            className={`px-3 py-2 rounded-lg ${isOwnMessage
+                              ? 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white'
+                              : 'bg-white text-gray-900 border border-gray-200'
+                              }`}
                           >
                             <p className="text-sm whitespace-pre-wrap break-words">{msg.message}</p>
                           </div>

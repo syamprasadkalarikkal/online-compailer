@@ -35,7 +35,7 @@ export const CollaborationBar = ({
         const collabUserIds = collaborators?.map(c => c.user_id).filter(Boolean) || [];
         const editorUserIds = activeEditors?.map(e => e.user_id).filter(Boolean) || [];
         const allUserIds = [...new Set([...collabUserIds, ...editorUserIds])];
-        
+
         if (allUserIds.length === 0) {
           setLoading(false);
           return;
@@ -82,7 +82,7 @@ export const CollaborationBar = ({
 
   const handleRemoveCollaborator = async (collaboratorUserId) => {
     if (!removeCollaborator) return;
-    
+
     const success = await removeCollaborator(collaboratorUserId);
     if (success) {
       alert('Collaborator removed successfully');
@@ -114,7 +114,7 @@ export const CollaborationBar = ({
   const validCollaborators = collaborators?.filter(c => c.user_id) || [];
   const whoIsEditing = activeEditors?.find(e => e.user_id !== user?.id);
 
-  if (loading || validCollaborators.length === 0 || validCollaborators.length === 1) {
+  if (loading || validCollaborators.length === 0) {
     return null;
   }
 
@@ -145,23 +145,22 @@ export const CollaborationBar = ({
                   const isCurrentUser = collaborator.user_id === user?.id;
                   const isActiveEditor = activeEditors?.some(e => e.user_id === collaborator.user_id) || false;
                   const profile = getCollaboratorProfile(collaborator);
-                  
+
                   return (
                     <div
                       key={collaborator.user_id}
                       className="relative group"
                       style={{ zIndex: validCollaborators.length - index }}
                     >
-                      <div className={`relative w-11 h-11 rounded-full ring-3 transition-all duration-200 ${
-                        isCurrentUser
+                      <div className={`relative w-11 h-11 rounded-full ring-3 transition-all duration-200 ${isCurrentUser
                           ? 'ring-emerald-400 hover:ring-emerald-500'
                           : isActiveEditor
-                          ? 'ring-amber-400 hover:ring-amber-500'
-                          : 'ring-white hover:ring-gray-200'
-                      }`}>
+                            ? 'ring-amber-400 hover:ring-amber-500'
+                            : 'ring-white hover:ring-gray-200'
+                        }`}>
                         {profile.avatar_url ? (
-                          <img 
-                            src={profile.avatar_url} 
+                          <img
+                            src={profile.avatar_url}
                             alt={profile.name || profile.email}
                             className="w-full h-full rounded-full object-cover bg-gray-100"
                             onError={(e) => {
@@ -173,20 +172,18 @@ export const CollaborationBar = ({
                             }}
                           />
                         ) : null}
-                        <div 
-                          className={`w-full h-full rounded-full flex items-center justify-center text-sm font-bold ${
-                            profile.avatar_url ? 'hidden' : 'flex'
-                          } ${
-                            isCurrentUser
+                        <div
+                          className={`w-full h-full rounded-full flex items-center justify-center text-sm font-bold ${profile.avatar_url ? 'hidden' : 'flex'
+                            } ${isCurrentUser
                               ? 'bg-gradient-to-br from-emerald-400 to-emerald-600 text-white'
                               : isActiveEditor
-                              ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white'
-                              : 'bg-gradient-to-br from-indigo-400 to-purple-600 text-white'
-                          }`}
+                                ? 'bg-gradient-to-br from-amber-400 to-amber-600 text-white'
+                                : 'bg-gradient-to-br from-indigo-400 to-purple-600 text-white'
+                            }`}
                         >
                           {getInitials(collaborator)}
                         </div>
-                        
+
                         {isActiveEditor && (
                           <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-amber-400 rounded-full border-2 border-white animate-pulse flex items-center justify-center">
                             <Edit3 className="w-2 h-2 text-white" />
@@ -209,7 +206,7 @@ export const CollaborationBar = ({
                           </button>
                         )}
                       </div>
-                      
+
                       {/* Tooltip */}
                       <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none shadow-lg z-50">
                         <div className="font-semibold">{profile.name || profile.email}</div>
@@ -253,13 +250,12 @@ export const CollaborationBar = ({
             <button
               onClick={handleEditToggle}
               disabled={!user || (isLocked && !currentUserIsEditing)}
-              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 shadow-lg ${
-                currentUserIsEditing
+              className={`flex items-center gap-2 px-5 py-2.5 rounded-lg font-semibold transition-all duration-200 shadow-lg ${currentUserIsEditing
                   ? 'bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white hover:shadow-xl hover:shadow-red-500/50'
                   : isLocked
-                  ? 'bg-gray-700/50 text-gray-black cursor-not-allowed'
-                  : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white hover:shadow-xl hover:shadow-green-500/50 disabled:opacity-50 disabled:cursor-not-allowed'
-              }`}
+                    ? 'bg-gray-700/50 text-gray-black cursor-not-allowed'
+                    : 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white hover:shadow-xl hover:shadow-green-500/50 disabled:opacity-50 disabled:cursor-not-allowed'
+                }`}
             >
               {currentUserIsEditing ? (
                 <>
@@ -285,7 +281,7 @@ export const CollaborationBar = ({
       {/* Remove confirmation modal */}
       {showRemoveConfirm && (
         <>
-          <div 
+          <div
             className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 transition-opacity"
             onClick={() => setShowRemoveConfirm(null)}
           />

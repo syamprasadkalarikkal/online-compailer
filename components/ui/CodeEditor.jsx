@@ -11,6 +11,7 @@ import { php } from "@codemirror/lang-php";
 import { Code, Check, Copy, RotateCcw, Download, Play, Lock, Pause, Plus, Save, Edit3, X } from 'lucide-react';
 import { CodeConverter } from './CodeConverter';
 import AICopilot from './AICopilot';
+import { CollaborationChat } from './CollaborationChat';
 
 const getLanguageExtension = (lang) => {
   switch (lang) {
@@ -95,10 +96,12 @@ export const CodeEditor = ({
   setCodeTitle,
   isSaving,
   saveMessage,
-  showSaveMessage
+  showSaveMessage,
+  supabase,
+  collaborators
 }) => {
   const [showSaveDialog, setShowSaveDialog] = useState(false);
-  
+
   const extensions = [
     ...getLanguageExtension(lang),
     whiteTheme,
@@ -125,9 +128,9 @@ export const CodeEditor = ({
     if (!codeTitle.trim() || codeTitle.trim().length > 100 || isSaving) {
       return;
     }
-    
+
     await saveCode();
-    
+
     setTimeout(() => {
       setShowSaveDialog(false);
     }, 10);
@@ -144,7 +147,7 @@ export const CodeEditor = ({
 
   const handleCodeConverted = (convertedCode, targetLang) => {
     setCode(convertedCode);
-    
+
     if (setLang && typeof setLang === 'function') {
       setLang(targetLang, true);
       alert(`✅ Code successfully converted to ${targetLang}!`);
@@ -177,7 +180,7 @@ export const CodeEditor = ({
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="flex items-center gap-3">
               <div className="flex-1">
                 <input
@@ -196,7 +199,7 @@ export const CodeEditor = ({
                   </div>
                 )}
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <span className="text-xs text-gray-600 px-2 py-1 bg-gray-100 rounded">
                   .{fileExtensions[lang] || 'txt'}
@@ -204,7 +207,7 @@ export const CodeEditor = ({
                 <span className="text-xs text-gray-500">
                   {code.split('\n').length} lines
                 </span>
-                
+
                 <button
                   onClick={handleSave}
                   disabled={isSaving || !codeTitle.trim() || codeTitle.trim().length > 100}
@@ -212,7 +215,7 @@ export const CodeEditor = ({
                 >
                   {isSaving ? 'Saving...' : currentCodeId ? 'Update' : 'Save'}
                 </button>
-                
+
                 <button
                   onClick={() => {
                     setShowSaveDialog(false);
@@ -224,14 +227,13 @@ export const CodeEditor = ({
                 </button>
               </div>
             </div>
-            
+
             {showSaveMessage && (
               <div className="mt-2">
-                <div className={`inline-block px-3 py-1 rounded text-sm ${
-                  saveMessage.includes('Failed') || saveMessage.includes('error') || saveMessage.includes('Please')
-                    ? 'bg-red-100 text-red-700'
-                    : 'bg-green-100 text-green-700'
-                }`}>
+                <div className={`inline-block px-3 py-1 rounded text-sm ${saveMessage.includes('Failed') || saveMessage.includes('error') || saveMessage.includes('Please')
+                  ? 'bg-red-100 text-red-700'
+                  : 'bg-green-100 text-green-700'
+                  }`}>
                   {saveMessage}
                 </div>
               </div>
@@ -245,7 +247,7 @@ export const CodeEditor = ({
           <Code className="w-5 h-5 text-indigo-600" />
           <span className="font-medium">Editor</span>
           <span className="text-sm text-gray-500">({lang})</span>
-          
+
           {readOnly && (
             <div className="flex items-center gap-1 px-2 py-0.5 bg-orange-100 border border-orange-300 rounded text-orange-700 text-xs">
               <Lock className="w-3 h-3" />
@@ -284,11 +286,10 @@ export const CodeEditor = ({
           {user ? (
             <button
               onClick={handleSaveClick}
-              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all text-sm font-medium ${
-                isEditingSavedCode
-                  ? 'bg-orange-600 text-white hover:bg-orange-700'
-                  : 'bg-gray-700 text-white hover:bg-gray-600'
-              }`}
+              className={`flex items-center gap-1 px-2 py-1.5 rounded-lg transition-all text-sm font-medium ${isEditingSavedCode
+                ? 'bg-orange-600 text-white hover:bg-orange-700'
+                : 'bg-gray-700 text-white hover:bg-gray-600'
+                }`}
               title={isEditingSavedCode ? 'Update saved code' : 'Save new code'}
             >
               {isEditingSavedCode ? (
@@ -309,21 +310,20 @@ export const CodeEditor = ({
               <span className="hidden sm:inline">Login to Save</span>
             </div>
           )}
-          
+
           <div className="w-px h-6 bg-gray-300"></div>
 
           <button
             onClick={copyCode}
-            className={`p-2 rounded-lg transition-all ${
-              isCopied
-                ? 'bg-gray-100 text-gray-700'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`p-2 rounded-lg transition-all ${isCopied
+              ? 'bg-gray-100 text-gray-700'
+              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
             title="Copy code"
           >
             {isCopied ? <Check className="w-4 h-3" /> : <Copy className="w-4 h-3" />}
           </button>
-          
+
           <button
             onClick={resetCode}
             disabled={readOnly}
@@ -332,7 +332,7 @@ export const CodeEditor = ({
           >
             <RotateCcw className="w-4 h-3" />
           </button>
-          
+
           <button
             onClick={downloadCode}
             className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
@@ -340,15 +340,14 @@ export const CodeEditor = ({
           >
             <Download className="w-4 h-3" />
           </button>
-          
+
           <button
             onClick={runCode}
             disabled={isRunning}
-            className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 ${
-              isRunning
-                ? 'bg-orange-100 text-orange-600 border border-orange-300'
-                : 'bg-gray-100 text-black hover:bg-gray-200'
-            }`}
+            className={`px-3 py-2 rounded-lg transition-all flex items-center gap-2 ${isRunning
+              ? 'bg-orange-100 text-orange-600 border border-orange-300'
+              : 'bg-gray-100 text-black hover:bg-gray-200'
+              }`}
           >
             {isRunning ? (
               <>
@@ -446,6 +445,16 @@ export const CodeEditor = ({
         onFixApplied={handleCopilotFix}
         isEnabled={!readOnly}
       />
+
+      {/* Floating Collaboration Chat */}
+      <div className="fixed bottom-6 right-24 z-50">
+        <CollaborationChat
+          currentCodeId={currentCodeId}
+          user={user}
+          supabase={supabase}
+          collaborators={collaborators}
+        />
+      </div>
     </div>
   );
 };

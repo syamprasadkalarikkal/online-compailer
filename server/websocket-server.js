@@ -41,7 +41,7 @@ class CollaborationRoom {
   removeClient(userId) {
     const client = this.clients.get(userId);
     this.clients.delete(userId);
-    
+
     // Release edit lock if this user was editing
     if (this.currentEditor === userId) {
       this.releaseEdit(userId);
@@ -138,7 +138,7 @@ class CollaborationRoom {
    */
   broadcast(message, excludeUserId = null) {
     const messageStr = JSON.stringify(message);
-    
+
     this.clients.forEach((client, userId) => {
       if (userId !== excludeUserId && client.ws.readyState === WebSocket.OPEN) {
         client.ws.send(messageStr);
@@ -166,7 +166,7 @@ wss.on('connection', (ws) => {
   ws.on('message', (data) => {
     try {
       const message = JSON.parse(data.toString());
-      
+
       switch (message.type) {
         case 'join':
           handleJoin(ws, message);
@@ -195,6 +195,8 @@ wss.on('connection', (ws) => {
             room?.updateLastSeen(userId);
           }
           break;
+
+
 
         default:
           break;
@@ -237,7 +239,7 @@ wss.on('connection', (ws) => {
     }
 
     room.addClient(userId, userEmail, ws);
-    
+
     // Send current code state to new user
     if (room.currentCode) {
       ws.send(JSON.stringify({
@@ -256,7 +258,7 @@ wss.on('connection', (ws) => {
     if (!room) return;
 
     const success = room.requestEdit(message.userId, message.userEmail);
-    
+
     // Send grant/deny response to requester
     ws.send(JSON.stringify({
       type: success ? 'edit_granted' : 'edit_denied',
@@ -297,6 +299,8 @@ wss.on('connection', (ws) => {
       position: message.position
     }, message.userId);
   }
+
+
 });
 
 // Cleanup inactive sessions every 5 minutes

@@ -1,10 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Check, X, Inbox, ChevronRight } from 'lucide-react';
 
-/**
- * Displays pending collaboration requests
- * Handles accepting/declining requests with real-time updates
- */
 export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -14,9 +10,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
   const panelRef = useRef(null);
   const buttonRef = useRef(null);
 
-  /**
-   * Set up real-time subscriptions and load initial requests
-   */
   useEffect(() => {
     if (user && supabase) {
       loadRequests();
@@ -47,9 +40,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
     }
   }, [user, supabase]);
 
-  /**
-   * Close panel when clicking outside
-   */
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (showPanel && 
@@ -68,9 +58,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
     };
   }, [showPanel]);
 
-  /**
-   * Loads all pending collaboration requests
-   */
   const loadRequests = async () => {
     if (!user || !supabase) return;
 
@@ -88,16 +75,12 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
 
       setRequests(requestsData || []);
     } catch (error) {
-      console.error('Error loading requests:', error);
       setRequests([]);
     } finally {
       setLoading(false);
     }
   };
 
-  /**
-   * Handles accepting or declining a collaboration request
-   */
   const handleRequest = async (request, action) => {
     if (!supabase) return;
 
@@ -105,7 +88,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
 
     try {
       if (action === 'accepted') {
-        // Add user as collaborator
         const { error: collabError } = await supabase
           .from('collaborators')
           .insert([{
@@ -120,7 +102,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
           throw new Error('Failed to add you as a collaborator: ' + collabError.message);
         }
 
-        // Update request status
         const { error: updateError } = await supabase
           .from('collaboration_requests')
           .update({ 
@@ -137,7 +118,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
           onAcceptRequest(request);
         }
       } else {
-        // Decline request
         const { error: updateError } = await supabase
           .from('collaboration_requests')
           .update({ 
@@ -154,7 +134,7 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
       setRequests(prev => prev.filter(r => r.id !== request.id));
       setExpandedId(null);
     } catch (error) {
-      console.error('Error handling request:', error);
+      // Error handling can be implemented here if needed
     } finally {
       setProcessing(null);
     }
@@ -228,7 +208,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                       onClick={() => setExpandedId(expandedId === request.id ? null : request.id)}
                       className="w-full px-4 py-3 flex items-center gap-3 hover:bg-gray-50 transition-colors text-left"
                     >
-                      {/* Avatar */}
                       <div className="relative w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden ring-2 ring-gray-200">
                         {request.sender_avatar_url ? (
                           <>
@@ -258,7 +237,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                         )}
                       </div>
                       
-                      {/* Request info */}
                       <div className="flex-1 min-w-0">
                         <p className="text-gray-900 text-sm font-medium truncate">
                           {getSenderDisplayName(request)}
@@ -283,7 +261,6 @@ export const CollaborationRequests = ({ user, supabase, onAcceptRequest }) => {
                       />
                     </button>
                     
-                    {/* Expanded content */}
                     {expandedId === request.id && (
                       <div className="px-4 pb-3 pt-1 bg-gray-50">
                         {isCustomMessage(request) && (

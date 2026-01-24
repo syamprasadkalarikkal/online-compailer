@@ -30,10 +30,10 @@ export async function POST(request) {
     }
 
     const dockerAvailable = await checkDockerAvailability();
-    
+
     if (!dockerAvailable) {
       return NextResponse.json(
-        { 
+        {
           error: 'Docker is not available. Please ensure Docker is installed and running.',
           output: '',
           executionTime: 0
@@ -74,9 +74,9 @@ export async function POST(request) {
 
   } catch (error) {
     console.error('Execution error:', error);
-    
+
     return NextResponse.json(
-      { 
+      {
         error: error.message || 'Internal server error',
         output: '',
         executionTime: 0,

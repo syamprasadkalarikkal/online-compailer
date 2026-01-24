@@ -334,7 +334,16 @@ export default function Client() {
 
       if (response.ok) {
         const result = await response.json();
-        setOutput(result.output || result.error || 'No output');
+        // If there's an error/stderr but also output (e.g. prompt then crash), show both
+        let displayOutput = result.output || '';
+
+        // Check both 'error' (API error) and 'stderr' (execution error)
+        const errorContent = result.error || result.stderr;
+
+        if (errorContent) {
+          displayOutput += (displayOutput ? '\n\n' : '') + 'Error:\n' + errorContent;
+        }
+        setOutput(displayOutput || 'No output');
         setExecTime(result.executionTime || Date.now() - startTime);
         setIsRunning(false);
       } else {

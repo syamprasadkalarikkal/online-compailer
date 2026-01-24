@@ -23,25 +23,65 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
         const userIds = collaborators.map(c => c.user_id).filter(Boolean);
         if (userIds.length === 0) return;
 
+        // Fetch all user profiles from database
         const { data, error } = await supabase
           .from('users')
           .select('user_id, name, avatar_url, email')
           .in('user_id', userIds);
 
+        const profilesMap = {};
+
+        // First, populate with collaborator data as fallback
+        collaborators.forEach(collab => {
+          profilesMap[collab.user_id] = {
+            user_id: collab.user_id,
+            name: collab.name || collab.email?.split('@')[0] || 'User',
+            email: collab.email,
+            avatar_url: null
+          };
+        });
+
+        // Then override with database data if available (this has the real profile data)
         if (!error && data) {
-          const profilesMap = {};
           data.forEach(profile => {
-            profilesMap[profile.user_id] = profile;
+            profilesMap[profile.user_id] = {
+              user_id: profile.user_id,
+              name: profile.name || 'User', // Use profile name, not email
+              email: profile.email,
+              avatar_url: profile.avatar_url
+            };
           });
-          setUserProfiles(profilesMap);
         }
+
+        // Ensure current user is included
+        if (user && !profilesMap[user.id]) {
+          profilesMap[user.id] = {
+            user_id: user.id,
+            name: user.email?.split('@')[0] || 'You',
+            email: user.email,
+            avatar_url: null
+          };
+        }
+
+        setUserProfiles(profilesMap);
       } catch (error) {
         console.error('Error loading profiles:', error);
+        // Fallback to collaborator email usernames
+        const fallbackProfiles = {};
+        collaborators.forEach(collab => {
+          fallbackProfiles[collab.user_id] = {
+            user_id: collab.user_id,
+            name: collab.name || collab.email?.split('@')[0] || 'User',
+            email: collab.email,
+            avatar_url: null
+          };
+        });
+        setUserProfiles(fallbackProfiles);
       }
     };
 
     loadProfiles();
-  }, [collaborators, supabase]);
+  }, [collaborators, supabase, user]);
 
   // WebSocket logic
   useEffect(() => {
@@ -229,7 +269,7 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
 
   const getInitials = (userId) => {
     const profile = getUserProfile(userId);
-    const name = profile.name || profile.email || '?';
+    const name = profile.name || 'U';
     const words = name.split(' ');
     if (words.length >= 2) {
       return (words[0][0] + words[1][0]).toUpperCase();
@@ -364,7 +404,7 @@ export const CollaborationChat = ({ currentCodeId, user, supabase, collaborators
                         <div className={`flex flex-col max-w-[70%] ${isOwnMessage ? 'items-end' : 'items-start'}`}>
                           {showAvatar && (
                             <span className="text-xs text-gray-600 font-medium mb-1 px-1">
-                              {isOwnMessage ? 'You' : profile.name || profile.email}
+                              {isOwnMessage ? 'You' : (profile.name || 'User')}
                             </span>
                           )}
                           <div
